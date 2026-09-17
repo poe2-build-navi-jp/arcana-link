@@ -10,6 +10,8 @@ import {
   type SiteLocale,
 } from '@/lib/site-i18n';
 
+const indexedLocales = new Set<SiteLocale>(['ja', 'en', 'zh-cn']);
+
 const homeMetadata = {
   ja: {
     title:
@@ -73,6 +75,7 @@ export function buildHomeMetadata(locale: SiteLocale): Metadata {
       canonical: localizedPath(locale),
       languages: languageAlternates(),
     },
+    robots: { index: indexedLocales.has(locale), follow: true },
     openGraph: {
       title: copy.title,
       description: copy.description,
@@ -102,6 +105,7 @@ export function buildTranslatedPageMetadata(
       canonical,
       languages: languageAlternates(page),
     },
+    robots: { index: true, follow: true },
     openGraph: {
       title: copy.title,
       description: copy.description,
@@ -130,7 +134,7 @@ export function buildInternationalPublicMetadata(
     title: `${title} | ARCANA LINK`,
     description,
     alternates: { canonical, languages: languageAlternates(page) },
-    robots: { index: true, follow: true },
+    robots: { index: indexedLocales.has(locale), follow: true },
     openGraph: {
       title,
       description,
