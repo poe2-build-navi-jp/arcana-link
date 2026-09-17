@@ -9,8 +9,6 @@ import {
   Copy,
   Download,
   Handshake,
-  Minus,
-  Plus,
   Share2,
   ShieldCheck,
   Sparkles,
@@ -18,7 +16,7 @@ import {
 } from '@/components/icons';
 import { ExchangeTable } from '@/components/exchange-table';
 import { track } from '@/lib/analytics';
-import { arcanaCards, cardBySlug } from '@/lib/arcana-cards';
+import { arcanaCards, cardBySlug, cardSlugById } from '@/lib/arcana-cards';
 import {
   collectedTypeCount,
   defaultInventory,
@@ -65,12 +63,22 @@ type Match = {
   score: number;
 };
 
+type ExchangeSummary = {
+  open: number;
+  recent: number;
+  asia: number;
+  updatedAt: string | null;
+};
+
 const storageKeys = {
   inventory: 'arcana-link-v2-inventory',
   profile: 'arcana-link-v2-profile',
   token: 'arcana-link-v2-token',
   notifications: 'arcana-link-v2-notifications',
   server: 'arcana_server',
+  reviewed: 'arcana-link-v2-reviewed',
+  lastVisit: 'arcana-link-v2-last-visit',
+  publishedAt: 'arcana-link-v2-published-at',
 };
 
 function tokenValue() {
@@ -244,6 +252,14 @@ function replaceServerTokens(value: string, values: Record<string, string>) {
   );
 }
 
+function relativeUpdate(locale: SiteLocale, value: string | null, now: number) {
+  if (!value) return '—';
+  const minutes = Math.max(0, Math.floor((now-Date.parse(value))/60000));
+  if (locale === 'ja') return minutes < 1 ? '1分以内' : minutes < 60 ? `${minutes}分前` : minutes < 1440 ? `${Math.floor(minutes/60)}時間前` : `${Math.floor(minutes/1440)}日前`;
+  if (locale === 'zh-cn') return minutes < 60 ? `${Math.max(1,minutes)}分钟前` : `${Math.floor(minutes/60)}小时前`;
+  return minutes < 60 ? `${Math.max(1,minutes)} min ago` : `${Math.floor(minutes/60)} hr ago`;
+}
+
 export function ExchangeHome({ locale }: { locale: SiteLocale }) {
   const copy = v2Copy[locale];
   const siteCopy = homeCopy[locale];
@@ -279,13 +295,25 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
   const [listingError, setListingError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [shareMode, setShareMode] = useState<'local' | 'shared'>('local');
+  const [summary, setSummary] = useState<ExchangeSummary | null>(null);
+  const [reviewedCards, setReviewedCards] = useState<ArcanaId[]>([]);
+  const [previousVisit, setPreviousVisit] = useState('');
+  const [revisitDismissed, setRevisitDismissed] = useState(false);
+  const [lastPublishedAt, setLastPublishedAt] = useState('');
+  const [currentTime, setCurrentTime] = useState(0);
+  const [profileDirty, setProfileDirty] = useState(false);
+  const [refreshVersion, setRefreshVersion] = useState(0);
   const [intent, setIntent] = useState<{slug:string; action:string} | null>(null);
   const registerTracked = useRef(false);
   const completeTracked = useRef(false);
   const matchTracked = useRef('');
+  const revisitTracked = useRef(false);
   const knownMatches = useRef<Set<string> | null>(null);
 
-  const missing = useMemo(() => neededCards(inventory), [inventory]);
+  const reviewedSet = useMemo(() => new Set(reviewedCards), [reviewedCards]);
+  const reviewedCount = reviewedCards.length;
+  const reviewComplete = reviewedCount === arcanaCards.length;
+  const missing = useMemo(() => neededCards(inventory).filter(card=>reviewedSet.has(card)), [inventory, reviewedSet]);
   const duplicates = useMemo(() => offeredCards(inventory), [inventory]);
   const collected = useMemo(() => collectedTypeCount(inventory), [inventory]);
   const progress = Math.round((collected / arcanaCards.length) * 100);
@@ -304,7 +332,7 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
     : '—';
 
   const matches = useMemo(() => {
-    if (!profile.server) return [];
+    if (!profile.server || !reviewComplete) return [];
     const currentUser = { server: profile.server, inventory };
     return filterCompatibleServer(profile.server, profiles)
       .filter(
@@ -329,10 +357,13 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
           b.score - a.score ||
           b.receive.length - a.receive.length,
       );
-  }, [inventory, profile.publicId, profile.server, profiles]);
+  }, [inventory, profile.publicId, profile.server, profiles, reviewComplete]);
 
   const exactCount = matches.filter((match) => match.exact).length;
   const partialCount = matches.length - exactCount;
+  const newMatchCount = useMemo(()=>previousVisit ? matches.filter(match=>match.exact && Date.parse(match.profile.updatedAt)>Date.parse(previousVisit)).length : 0,[matches,previousVisit]);
+  const listingAge = lastPublishedAt && currentTime ? currentTime-Date.parse(lastPublishedAt) : 0;
+  const expiresSoon = Boolean(profile.publicId && profile.status !== 'closed' && listingAge >= 6*86400000 && listingAge < 7*86400000);
 
   /* oxlint-disable react/react-compiler -- Saved browser state is intentionally hydrated after mount. */
   useEffect(() => {
@@ -344,6 +375,17 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
     const savedProfile = JSON.parse(
       localStorage.getItem(storageKeys.profile) || 'null',
     ) as (Omit<LocalProfile, 'server'> & { server?: unknown }) | null;
+    const savedReviewed = JSON.parse(localStorage.getItem(storageKeys.reviewed) || '[]') as unknown;
+    if (Array.isArray(savedReviewed)) {
+      const valid = savedReviewed.filter((card): card is ArcanaId=>typeof card === 'string' && arcanaCards.some(item=>item.id===card));
+      if (valid.length) setReviewedCards([...new Set(valid)]);
+      else if (savedProfile?.publicId || (savedInventory && collectedTypeCount(savedInventory)>0)) setReviewedCards(arcanaCards.map(card=>card.id));
+    }
+    const lastVisit = localStorage.getItem(storageKeys.lastVisit) || '';
+    setPreviousVisit(lastVisit);
+    setCurrentTime(Date.now());
+    localStorage.setItem(storageKeys.lastVisit, new Date().toISOString());
+    setLastPublishedAt(localStorage.getItem(storageKeys.publishedAt) || '');
     const savedServer =
       normalizeServerRegion(localStorage.getItem(storageKeys.server)) ??
       normalizeServerRegion(savedProfile?.server);
@@ -356,6 +398,7 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
     const offerSlugs = new Set((params.get('offer') || '').split(',').filter(slug=>Object.hasOwn(cardBySlug,slug)));
     if (params.has('want') || params.has('offer')) {
       setInventory(Object.fromEntries(arcanaCards.map(card=>[card.id,wantSlugs.has(card.slug)?0:offerSlugs.has(card.slug)?2:1])) as InventoryCounts);
+      setReviewedCards(arcanaCards.map(card=>card.id));
     }
     const requestedCard = params.get('card');
     if (requestedCard && Object.hasOwn(cardBySlug, requestedCard)) setIntent({slug:requestedCard,action:params.get('intent') === 'offer' ? 'offer' : 'want'});
@@ -389,10 +432,28 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
     localStorage.setItem(storageKeys.inventory, JSON.stringify(inventory));
     localStorage.setItem(storageKeys.profile, JSON.stringify(profile));
     localStorage.setItem(storageKeys.notifications, String(notifications));
+    localStorage.setItem(storageKeys.reviewed, JSON.stringify(reviewedCards));
     if (profile.server) {
       localStorage.setItem(storageKeys.server, profile.server);
     }
-  }, [hydrated, inventory, notifications, profile]);
+  }, [hydrated, inventory, notifications, profile, reviewedCards]);
+
+  useEffect(() => {
+    let stopped = false;
+    const refreshSummary = async () => {
+      try {
+        const response = await fetch('/api/profiles?summary=1', { cache: 'no-store' });
+        if (!response.ok) return;
+        const data = await response.json() as ExchangeSummary;
+        if (!stopped) setSummary(data);
+      } catch {
+        // The service summary stays hidden if the shared database is unavailable.
+      }
+    };
+    void refreshSummary();
+    const interval = window.setInterval(refreshSummary, 300_000);
+    return () => { stopped = true; window.clearInterval(interval); };
+  }, []);
 
   useEffect(() => {
     if (!profile.server) return;
@@ -436,7 +497,9 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
   useEffect(() => {
     if (
       !hydrated ||
+      !profileDirty ||
       !token ||
+      !reviewComplete ||
       !profile.server ||
       !profile.displayName.trim() ||
       !/^\d{9,10}$/.test(profile.uid)
@@ -453,11 +516,18 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
         const data = (await response.json()) as {
           publicId?: string;
           mode?: 'local' | 'shared';
+          updatedAt?: string;
         };
         if (data.mode === 'shared') {
           setShareMode('shared');
           setSaving(false);
           setToast(copy.saved);
+          if (data.updatedAt) {
+            setLastPublishedAt(data.updatedAt);
+            setCurrentTime(Date.now());
+            localStorage.setItem(storageKeys.publishedAt, data.updatedAt);
+          }
+          setProfileDirty(false);
           if (!completeTracked.current) {track('register_complete', {server:profile.server}); completeTracked.current = true;}
         }
         if (data.publicId && data.publicId !== profile.publicId) {
@@ -470,9 +540,14 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
       }
     }, 700);
     return () => window.clearTimeout(timer);
-  }, [hydrated, inventory, locale, profile, token]);
+  }, [hydrated, inventory, locale, profile, profileDirty, refreshVersion, reviewComplete, token]);
 
   useEffect(() => {
+    const newExact = newMatchCount;
+    if (newExact && !revisitTracked.current) {
+      track('revisit_match', {count:newExact});
+      revisitTracked.current = true;
+    }
     const liveIds = matches.filter(m=>m.exact && !m.profile.sample).map(m=>m.profile.publicId).sort().join(',');
     if (liveIds && liveIds !== matchTracked.current) track('match_found', {count:matches.filter(m=>m.exact && !m.profile.sample).length});
     matchTracked.current = liveIds;
@@ -498,30 +573,42 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
       );
     }
     knownMatches.current = exactIds;
-  }, [locale, matches, notifications]);
+  }, [locale, matches, newMatchCount, notifications]);
 
   function startRegistration() {
     if (!registerTracked.current) {track('register_start'); registerTracked.current = true;}
   }
-  function updateCount(card: ArcanaId, change: -1 | 1) {
+  function setCount(card: ArcanaId, count: CardCount) {
     startRegistration();
-    if (!profile.server) {
-      setServerOpen(true);
-      return;
-    }
-    setInventory((current) => ({
-      ...current,
-      [card]: Math.max(0, Math.min(3, current[card] + change)) as CardCount,
-    }));
+    if (!profile.server) { setServerOpen(true); return; }
+    setInventory(current=>({...current,[card]:count}));
+    setReviewedCards(current=>current.includes(card)?current:[...current,card]);
+    setProfileDirty(true);
+  }
+
+  function refreshListing() {
+    if (!reviewComplete || !profile.publicId) return;
+    setSaving(true);
+    setToast(locale === 'ja' ? '募集を更新しています…' : 'Refreshing listing…');
+    track('listing_refresh', {server:profile.server});
+    setProfileDirty(true);
+    setRefreshVersion(current=>current+1);
   }
 
   function setStatus(status: ExchangeStatus) {
     setProfile((current) => ({ ...current, status }));
+    setProfileDirty(true);
     setToast(statusLabel(locale, status));
   }
 
   function submitProfile(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!reviewComplete) {
+      setProfileOpen(false);
+      setToast(locale === 'ja' ? `残り${arcanaCards.length-reviewedCount}種類を確認すると募集を公開できます。` : `Review ${arcanaCards.length-reviewedCount} more cards before publishing.`);
+      window.location.hash = 'inventory';
+      return;
+    }
     if (!profile.server) {
       setProfileOpen(false);
       setServerOpen(true);
@@ -535,6 +622,7 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
       note: String(form.get('note') || '').trim(),
       status: 'open',
     }));
+    setProfileDirty(true);
     setProfileOpen(false);
     setSaving(true);
     setToast(locale === 'ja' ? '公開募集を保存しています…' : 'Saving your listing…');
@@ -586,6 +674,7 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
     if (!serverChoice) return;
     if (!profile.server) {
       setProfile((current) => ({ ...current, server: serverChoice }));
+      setProfileDirty(true);
       setRequestedServer((current) =>
         current === serverChoice ? null : current,
       );
@@ -603,6 +692,7 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
   function confirmServerChange() {
     if (!pendingServer) return;
     setProfile((current) => ({ ...current, server: pendingServer }));
+    setProfileDirty(true);
     setRequestedServer((current) =>
       current === pendingServer ? null : current,
     );
@@ -628,6 +718,7 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
       [receive]: Math.min(3, current[receive] + 1) as CardCount,
     }));
     setProfile((current) => ({ ...current, status: 'open' }));
+    setProfileDirty(true);
     setSelectedMatch(null);
     setToast(copy.completed);
   }
@@ -640,8 +731,11 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
   }
 
   function shareText() {
-    const url = profile.publicId ? 'https://arcana-card-link.pages.dev/genshin-arcana/share/' + profile.publicId : 'https://arcana-card-link.pages.dev/genshin-arcana/exchange-table';
-    return ['【原神 月諭アルカナ交換】', '求：' + (missing.map(c=>labels[c]).join(' / ') || 'なし'), '譲：' + (duplicates.map(c=>labels[c]).join(' / ') || 'なし'), 'Server：' + activeServerLabel, '交換条件はこちら', url + '?utm_source=x&utm_medium=social&utm_campaign=exchange', '#原神 #アルカナ交換'].join('\n');
+    const params = new URLSearchParams({server:profile.server||'asia',want:missing.map(card=>cardSlugById[card]).join(','),offer:duplicates.map(card=>cardSlugById[card]).join(','),utm_source:'x',utm_medium:'social',utm_campaign:'exchange'});
+    const url = profile.publicId ? `https://arcana-card-link.pages.dev/genshin-arcana/share/${profile.publicId}?utm_source=x&utm_medium=social&utm_campaign=exchange` : `https://arcana-card-link.pages.dev/?${params.toString()}#matches`;
+    if (locale === 'en') return ['Looking for Genshin Impact Lunar Arcana trades!','【Wanted】 '+(missing.map(c=>labels[c]).join(' / ')||'None'),'【Offered】 '+(duplicates.map(c=>labels[c]).join(' / ')||'None'),'Server: '+activeServerLabel,'Check compatible trades 👇',url,'#GenshinImpact #ArcanaTrade'].join('\n');
+    if (locale === 'zh-cn') return ['寻找原神月谕圣牌交换伙伴！','【求】'+(missing.map(c=>labels[c]).join(' / ')||'无'),'【出】'+(duplicates.map(c=>labels[c]).join(' / ')||'无'),'Server：'+activeServerLabel,'查看匹配条件👇',url,'#原神 #月谕圣牌'].join('\n');
+    return ['原神の月諭アルカナ交換相手を探しています！','【求】'+(missing.map(c=>labels[c]).join(' / ')||'なし'),'【譲】'+(duplicates.map(c=>labels[c]).join(' / ')||'なし'),'Server：'+activeServerLabel,'条件が合う方はこちら👇',url,'#原神 #原神アルカナ #アルカナ交換'].join('\n');
   }
 
   async function collectionImage() {
@@ -717,25 +811,25 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
     context.strokeRect(814.5, 68.5, 313, 479);
     context.fillStyle = '#d7b778';
     context.font = '700 16px system-ui, sans-serif';
-    context.fillText(shareCopy.missing.toUpperCase(), 850, 122);
+    context.fillText('SERVER', 850, 122);
     context.fillStyle = '#fff';
-    context.font = '700 60px Georgia, serif';
-    context.fillText(String(missing.length), 850, 188);
-    context.fillStyle = '#91aabe';
-    context.font = '500 20px system-ui, sans-serif';
-    context.fillText(summarizedNames(missing) || '—', 850, 226);
+    context.font = '700 34px Georgia, serif';
+    context.fillText(activeServerLabel, 850, 170, 240);
     context.fillStyle = '#d7b778';
     context.font = '700 16px system-ui, sans-serif';
-    context.fillText(shareCopy.duplicates.toUpperCase(), 850, 310);
-    context.fillStyle = '#fff';
-    context.font = '700 60px Georgia, serif';
-    context.fillText(String(duplicateCopies), 850, 376);
+    context.fillText(locale === 'en' ? 'WANTED' : '求', 850, 230);
     context.fillStyle = '#91aabe';
     context.font = '500 20px system-ui, sans-serif';
-    context.fillText(summarizedNames(duplicates) || '—', 850, 414);
+    context.fillText(summarizedNames(missing) || '—', 850, 270, 240);
+    context.fillStyle = '#d7b778';
+    context.font = '700 16px system-ui, sans-serif';
+    context.fillText(locale === 'en' ? 'OFFERED' : locale === 'ja' ? '譲' : '出', 850, 340);
+    context.fillStyle = '#91aabe';
+    context.font = '500 20px system-ui, sans-serif';
+    context.fillText(summarizedNames(duplicates) || '—', 850, 380, 240);
     context.fillStyle = '#f4e3bf';
-    context.font = '700 20px system-ui, sans-serif';
-    context.fillText(shareCopy.challenge, 850, 500);
+    context.font = '700 18px system-ui, sans-serif';
+    context.fillText(locale === 'ja' ? '条件が合う相手を自動で探せます' : locale === 'en' ? 'Find compatible trades automatically' : '自动寻找条件匹配的伙伴', 850, 500, 240);
 
     context.fillStyle = '#8299ab';
     context.font = '600 17px system-ui, sans-serif';
@@ -754,6 +848,7 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
   }
 
   async function saveShareImage() {
+    track('share_image', {server:profile.server});
     setShareBusy(true);
     try {
       const blob = await collectionImage();
@@ -814,6 +909,7 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
 
   async function copyShareText() {
     await navigator.clipboard.writeText(shareText());
+    track('share_copy', {server:profile.server});
     setToast(shareCopy.copiedDone);
   }
 
@@ -876,6 +972,8 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
         </button>
       )}
 
+      {newMatchCount>0 && !revisitDismissed && <div className="v2-return-notice"><span>🎉 {locale==='ja'?`前回のアクセス後に${newMatchCount}件の新しい完全マッチがあります`:locale==='en'?`${newMatchCount} new exact match${newMatchCount>1?'es':''} since your last visit`:`上次访问后有${newMatchCount}个新的完全匹配`}</span><a href="#matches" onClick={()=>setRevisitDismissed(true)}>{locale==='ja'?'マッチを見る':'View matches'}</a></div>}
+
       {requestedServer &&
         profile.server &&
         requestedServer !== profile.server && (
@@ -899,7 +997,12 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
           </div>
         )}
 
-      <div className="quality-intro"><p>{locale==='ja'?'所持数0枚は「求」、2枚以上は「譲」。同じサーバーで、お互いに不足を補える相手を探します。入力だけならUIDは不要です。':locale==='en'?'Enter your card counts to find two-way matches on your server. No UID is needed to edit your inventory.':'登记持有数量，寻找同服务器的双向交换伙伴。输入圣牌数量无需UID。'}</p><nav><a href={localizedPath(locale,'guide')}>{locale==='ja'?'使い方・マッチ判定の例':'How it works'}</a><a href={localizedPath(locale,'genshin-arcana')}>{locale==='ja'?'ゲーム内の交換手順':'Exchange guide'}</a></nav></div>
+      <section className="quality-intro">
+        <h2>{locale==='ja'?'掲示板を1件ずつ探す必要はありません':locale==='en'?'Skip searching listings one by one':'无需逐条查找交换帖'}</h2>
+        <ul><li>{locale==='ja'?'お互いの「求・譲」を自動比較':locale==='en'?'Compare both wanted and offered cards':'自动比较双方求与出'}</li><li>{locale==='ja'?'同じサーバーだけ表示':locale==='en'?'Show players on your server only':'仅显示同服务器玩家'}</li><li>{locale==='ja'?'条件一致した相手を優先表示':locale==='en'?'Prioritize two-way matches':'优先显示双向匹配'}</li><li>{locale==='ja'?'7日以上更新のない募集は除外':locale==='en'?'Exclude listings inactive for 7 days':'排除7天未更新招募'}</li></ul>
+        <nav><a className="card-seo-action" href="#inventory" onClick={()=>{startRegistration();if(!profile.server)setServerOpen(true);}}>{locale==='ja'?'カードを登録して相手を探す':locale==='en'?'Add cards and find a match':'登记圣牌并寻找伙伴'}</a><a href={localizedPath(locale,'guide')}>{locale==='ja'?'使い方を見る':'How it works'}</a></nav>
+      </section>
+      {summary && <section className="v2-service-status" aria-label={locale==='ja'?'現在の交換状況':'Current exchange activity'}><h2>{locale==='ja'?'現在の交換状況':locale==='en'?'Current exchange activity':'当前交换状态'}</h2>{summary.open>=10?<div><span><b>{summary.open}</b>{locale==='ja'?'受付中':' open'}</span><span><b>{summary.recent}</b>{locale==='ja'?'今日更新':' updated today'}</span><span><b>{summary.asia}</b>Asia</span><span><b>{relativeUpdate(locale,summary.updatedAt,currentTime)}</b>{locale==='ja'?'最終更新':' last update'}</span></div>:<p>{summary.recent>0?(locale==='ja'?'最近更新された募集があります':locale==='en'?'Listings were updated recently':'最近有更新的招募'):(locale==='ja'?'募集データを自動更新しています':locale==='en'?'Listing data updates automatically':'招募数据自动更新')} · {locale==='ja'?'最終更新':'Updated'} {relativeUpdate(locale,summary.updatedAt,currentTime)}</p>}</section>}
       <section className="v2-overview" aria-labelledby="collection-heading">
         <div className="v2-progress-card">
           <div className="v2-progress-head">
@@ -908,23 +1011,17 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
               <h1 id="collection-heading">{locale === 'ja' ? '原神 月諭アルカナ交換マッチング' : locale === 'en' ? 'Find a Lunar Arcana trading partner' : '自动寻找月谕圣牌交换伙伴'}</h1>
               <p className="v2-same-server-lead">{copy.sameServerLead}</p>
             </div>
-            <strong>{progress}%</strong>
+            <strong>{reviewComplete?`${progress}%`:`${reviewedCount}/22`}</strong>
           </div>
-          {!profile.publicId && collected === 0 && <div className="seo-empty"><p>{locale === 'ja' ? '未登録：まだカード情報が登録されていません。' : locale === 'en' ? 'No cards registered yet.' : '尚未登记圣牌。'}</p><a href="#inventory" onClick={()=>{startRegistration(); if (!profile.server) setServerOpen(true);}}>{locale === 'ja' ? '登録を始める' : locale === 'en' ? 'Start registration' : '开始登记'}</a></div>}
-          <div className="v2-progress-track" aria-label={`${progress}%`}>
-            <i style={{ width: `${progress}%` }} />
+          {!profile.publicId && reviewedCount === 0 && <div className="seo-empty"><p>{locale === 'ja' ? '未入力：カード情報はまだ登録されていません。0枚を選ぶと「未所持」として確定します。' : locale === 'en' ? 'Not entered yet. Choose 0 to confirm a missing card.' : '尚未输入。选择0后才会确认为未持有。'}</p><a href="#inventory" onClick={()=>{startRegistration(); if (!profile.server) setServerOpen(true);}}>{locale === 'ja' ? '登録を始める' : locale === 'en' ? 'Start registration' : '开始登记'}</a></div>}
+          <div className="v2-progress-track" aria-label={`${reviewComplete?progress:Math.round(reviewedCount/22*100)}%`}>
+            <i style={{ width: `${reviewComplete?progress:Math.round(reviewedCount/22*100)}%` }} />
           </div>
           <div className="v2-progress-meta">
-            <b>
-              {collected} / 22 <span>{copy.owned}</span>
-            </b>
-            <span>
-              {missing.length
-                ? copy.remaining.replace('{count}', String(missing.length))
-                : copy.complete}
-            </span>
+            <b>{reviewComplete?collected:reviewedCount} / 22 <span>{reviewComplete?copy.owned:(locale==='ja'?'入力済み':'reviewed')}</span></b>
+            <span>{reviewComplete?(missing.length?copy.remaining.replace('{count}',String(missing.length)):copy.complete):(locale==='ja'?`あと${22-reviewedCount}種類を確認`:`${22-reviewedCount} to review`)}</span>
           </div>
-          <div className="v2-summary-columns">
+          {reviewedCount>0 && <div className="v2-summary-columns">
             <div>
               <small>{copy.missing}</small>
               <div className="v2-mini-cards">
@@ -949,10 +1046,11 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
                 )}
               </div>
             </div>
-          </div>
+          </div>}
           <button
             className="v2-share-launch"
-            onClick={() => {if (!profile.server) {setServerOpen(true); return;} track('exchange_table_create', {server:profile.server}); setShareOpen(true);}} 
+            disabled={!reviewComplete}
+            onClick={() => {if(!reviewComplete){setToast(locale==='ja'?`残り${22-reviewedCount}種類を確認してください。`:'Review all 22 cards first.');window.location.hash='inventory';return;}if (!profile.server) {setServerOpen(true); return;} track('exchange_table_create', {server:profile.server}); setShareOpen(true);}}
             type="button"
           >
             <span>
@@ -960,7 +1058,7 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
               <b>{locale === 'ja' ? '交換表を作る' : shareCopy.open}</b>
             </span>
             <small>
-              {collected}/22 · {progress}% →
+              {reviewComplete?`${collected}/22 · ${progress}%`:`${reviewedCount}/22 入力`} →
             </small>
           </button>
         </div>
@@ -987,6 +1085,7 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
               ),
             )}
           </div>
+          {expiresSoon && <div className="v2-expiry-warning"><p>{locale==='ja'?'あなたの募集はあと1日以内で期限切れです。':'Your listing expires within one day.'}</p><button onClick={refreshListing} type="button">{locale==='ja'?'募集を更新':'Refresh listing'}</button></div>}
           <button
             className={`v2-alert-toggle ${notifications ? 'active' : ''}`}
             type="button"
@@ -1011,13 +1110,13 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
         </aside>
       </section>
 
-      {saving && <p role="status">{locale==='ja'?'公開保存中…':'Saving…'}</p>}
+      {saving && <output>{locale==='ja'?'公開保存中…':'Saving…'}</output>}
       <section className="v2-inventory-section" id="inventory">
         {intent && <div className="seo-empty"><p>{labels[cardBySlug[intent.slug].id]}：{locale === 'ja' ? (intent.action === 'offer' ? 'このカードを出せる方は、実際の所持数を2枚以上で入力してください。' : 'このカードを探す方は、所持数を0枚にしてください。') : 'Confirm your actual card count below.'}</p><p>{locale === 'ja' ? '他の21種類も確認すると、相互に条件の合う相手を探せます。' : 'Check all 22 counts to find a two-way match.'}</p></div>}
         <header className="v2-section-heading">
           <div>
             <span className="v2-kicker">01 · INVENTORY</span>
-            <h2>{copy.inventory}</h2>
+            <h2>{copy.inventory}<small>{reviewComplete?(locale==='ja'?'22 / 22 入力完了 ✓':'22 / 22 complete'):`${reviewedCount} / 22 ${locale==='ja'?'入力済み':'reviewed'}`}</small></h2>
           </div>
           <p>{copy.inventoryHint}</p>
         </header>
@@ -1035,9 +1134,10 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
         <div className="v2-inventory-grid">
           {arcanaCards.map((card, index) => {
             const count = inventory[card.id];
+            const reviewed = reviewedSet.has(card.id);
             return (
               <article
-                className={`v2-card-count ${count === 0 ? 'missing' : count >= 2 ? 'duplicate' : ''}`}
+                className={`v2-card-count ${!reviewed?'unreviewed':count === 0 ? 'missing' : count >= 2 ? 'duplicate' : ''}`}
                 key={card.id}
               >
                 <div className="v2-card-identity">
@@ -1045,33 +1145,15 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
                   <i>{card.symbol}</i>
                   <strong>{labels[card.id]}</strong>
                 </div>
-                <div
-                  className="v2-counter"
-                  aria-label={`${labels[card.id]} ${countLabel(locale, count)}`}
-                >
-                  <button
-                    aria-label={`${labels[card.id]} −1`}
-                    disabled={!profile.server || count === 0}
-                    onClick={() => updateCount(card.id, -1)}
-                    type="button"
-                  >
-                    <Minus size={15} />
-                  </button>
-                  <b>{count === 3 ? '3+' : count}</b>
-                  <button
-                    aria-label={`${labels[card.id]} +1`}
-                    disabled={!profile.server || count === 3}
-                    onClick={() => updateCount(card.id, 1)}
-                    type="button"
-                  >
-                    <Plus size={15} />
-                  </button>
+                <div className="v2-count-options" aria-label={`${labels[card.id]} ${reviewed?countLabel(locale,count):locale==='ja'?'未入力':'Not entered'}`}>
+                  {([0,1,2,3] as CardCount[]).map(value=><button aria-pressed={reviewed&&count===value} disabled={!profile.server} key={value} onClick={()=>setCount(card.id,value)} type="button">{value===3?'3+':value}</button>)}
                 </div>
-                <small>{countLabel(locale, count)}</small>
+                <small>{reviewed?countLabel(locale,count):(locale==='ja'?'未入力':locale==='en'?'Not entered':'未输入')}</small>
               </article>
             );
           })}
         </div>
+        {reviewComplete && <div className="v2-ready-panel"><div><span className="v2-kicker">READY</span><h3>{locale==='ja'?'交換準備完了':locale==='en'?'Ready to trade':'交换准备完成'}</h3><p><b>{locale==='ja'?'求':'Wanted'}：</b>{missing.map(card=>labels[card]).join(' / ')||'—'}</p><p><b>{locale==='ja'?'譲':'Offered'}：</b>{duplicates.map(card=>labels[card]).join(' / ')||'—'}</p></div><nav><a className="v2-primary" href="#matches">{locale==='ja'?'条件が合う相手を探す':'Find compatible players'}</a><button className="v2-x-button" onClick={()=>void postToX()} type="button">𝕏 {locale==='ja'?'で交換募集する':'Share on X'}</button><button onClick={()=>{track('exchange_table_create',{server:profile.server});setShareOpen(true);}} type="button">{locale==='ja'?'交換表を保存する':'Save exchange table'}</button></nav></div>}
       </section>
 
       <section className="v2-match-section" id="matches">
@@ -1107,7 +1189,9 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
             <small>🌏 {activeServerLabel}</small>
           </div>
         )}
-        {!profile.server ? (
+        {!reviewComplete ? (
+          <div className="v2-empty"><p>{locale==='ja'?`残り${22-reviewedCount}種類を確認すると、実際の条件でマッチングを開始します。`:'Review all 22 cards to start matching with accurate conditions.'}</p><a className="card-seo-action" href="#inventory">{locale==='ja'?'カード入力を続ける':'Continue card entry'}</a></div>
+        ) : !profile.server ? (
           <div className="v2-empty v2-server-empty">
             <span aria-hidden="true">🌏</span>
             <p>{serverCopy.locked}</p>

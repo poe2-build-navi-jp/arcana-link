@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { normalizeInventory } from '@/lib/arcana-profile';
-import { readProfiles, saveProfile } from '@/lib/arcana-db';
+import { readExchangeSummary, readProfiles, saveProfile } from '@/lib/arcana-db';
 import { siteLocales, type SiteLocale } from '@/lib/site-i18n';
 import { type ExchangeStatus } from '@/lib/v2-i18n';
 import { normalizeServerRegion, type ServerRegion } from '@/lib/server-region';
@@ -8,6 +8,16 @@ import { normalizeServerRegion, type ServerRegion } from '@/lib/server-region';
 const statuses = new Set<ExchangeStatus>(['open', 'negotiating', 'closed']);
 
 export async function GET(request: NextRequest) {
+  if (request.nextUrl.searchParams.get('summary') === '1') {
+    const summary = await readExchangeSummary();
+    if (!summary) return NextResponse.json({ error: 'unavailable' }, { status: 503 });
+    return NextResponse.json({
+      open: summary.open_count || 0,
+      recent: summary.recent_count || 0,
+      asia: summary.asia_count || 0,
+      updatedAt: summary.updated,
+    }, { headers: { 'Cache-Control': 'public, max-age=60' } });
+  }
   const server = normalizeServerRegion(
     request.nextUrl.searchParams.get('server'),
   );

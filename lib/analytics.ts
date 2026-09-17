@@ -1,5 +1,5 @@
 // Never send UID, names, tokens, notes or complete URLs to analytics.
-export type AnalyticsEvent = 'card_page_view' | 'register_start' | 'register_complete' | 'match_found' | 'exchange_table_create' | 'share_x' | 'share_url_view' | 'uid_copy';
+export type AnalyticsEvent = 'card_page_view' | 'register_start' | 'register_complete' | 'match_found' | 'exchange_table_create' | 'share_x' | 'share_copy' | 'share_image' | 'share_url_view' | 'uid_copy' | 'listing_refresh' | 'revisit_match';
 export function track(event: AnalyticsEvent, properties: {card?: string; server?: string; count?: number} = {}) {
   if (typeof window === 'undefined') return;
   const source = (() => {

@@ -29,6 +29,23 @@ function database() {
   return (env as unknown as { DB?: D1Database }).DB;
 }
 
+export async function readExchangeSummary() {
+  const db = database();
+  if (!db) return null;
+  const cutoff = new Date(Date.now() - 7 * 86400000).toISOString();
+  const recent = new Date(Date.now() - 86400000).toISOString();
+  try {
+    return await db.prepare(`SELECT
+      SUM(CASE WHEN status = 'open' THEN 1 ELSE 0 END) AS open_count,
+      SUM(CASE WHEN status = 'open' AND updated_at >= ? THEN 1 ELSE 0 END) AS recent_count,
+      SUM(CASE WHEN status = 'open' AND lower(server) = 'asia' THEN 1 ELSE 0 END) AS asia_count,
+      MAX(CASE WHEN status = 'open' THEN updated_at END) AS updated
+      FROM exchange_profiles WHERE updated_at >= ?`)
+      .bind(recent, cutoff)
+      .first<{open_count:number;recent_count:number;asia_count:number;updated:string|null}>();
+  } catch { return null; }
+}
+
 export async function readCardStats(card: ArcanaId) {
   const db = database();
   if (!db) return null;
