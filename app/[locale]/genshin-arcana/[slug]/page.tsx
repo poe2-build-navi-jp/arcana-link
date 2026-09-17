@@ -33,7 +33,13 @@ export async function generateMetadata({
 }) {
   const p = await params;
   const l = locale(p.locale);
-  return isSeoTopic(p.slug) || isServerPageSlug(p.slug)
+  if (isSeoTopic(p.slug)) {
+    return {
+      ...buildSeoPageMetadata(l, p.slug),
+      robots: { index: false, follow: true },
+    };
+  }
+  return isServerPageSlug(p.slug)
     ? buildSeoPageMetadata(l, p.slug)
     : buildCardMetadata(l, p.slug);
 }
