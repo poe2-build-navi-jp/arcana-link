@@ -25,7 +25,13 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  return isSeoTopic(slug) || isServerPageSlug(slug)
+  if (isSeoTopic(slug)) {
+    return {
+      ...buildSeoPageMetadata('en', slug),
+      robots: { index: false, follow: true },
+    };
+  }
+  return isServerPageSlug(slug)
     ? buildSeoPageMetadata('en', slug)
     : buildCardMetadata(
         'en',
