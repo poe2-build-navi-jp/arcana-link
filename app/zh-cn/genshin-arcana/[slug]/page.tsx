@@ -24,7 +24,13 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  return isSeoTopic(slug) || isServerPageSlug(slug)
+  if (isSeoTopic(slug)) {
+    return {
+      ...buildSeoPageMetadata('zh-cn', slug),
+      robots: { index: false, follow: true },
+    };
+  }
+  return isServerPageSlug(slug)
     ? buildSeoPageMetadata('zh-cn', slug)
     : buildCardMetadata('zh-cn', slug);
 }
