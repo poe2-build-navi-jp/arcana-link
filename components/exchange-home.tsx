@@ -16,7 +16,9 @@ import {
   Sparkles,
   X,
 } from '@/components/icons';
-import { arcanaCards } from '@/lib/arcana-cards';
+import { ExchangeTable } from '@/components/exchange-table';
+import { track } from '@/lib/analytics';
+import { arcanaCards, cardBySlug } from '@/lib/arcana-cards';
 import {
   collectedTypeCount,
   defaultInventory,
@@ -33,7 +35,6 @@ import {
   homeCopy,
   languageLinks,
   localeInfo,
-  localeShortLabel,
   localizedPath,
   romans,
   type ArcanaId,
@@ -72,77 +73,6 @@ const storageKeys = {
   server: 'arcana_server',
 };
 
-function inventoryWith(wants: ArcanaId[], offers: ArcanaId[]) {
-  const inventory = Object.fromEntries(
-    arcanaCards.map((card) => [card.id, 1]),
-  ) as InventoryCounts;
-  for (const card of wants) inventory[card] = 0;
-  for (const card of offers) inventory[card] = 2;
-  return inventory;
-}
-
-function sampleProfiles(locale: SiteLocale): ExchangeProfile[] {
-  const text = {
-    ja: {
-      names: ['カード収集家', '白月', 'ルイルイ', 'NorthStar', '星めぐり'],
-      notes: [
-        '今夜22時ごろまでログインできます。',
-        '交換後はすぐに解散でOKです。',
-        '申請時に「ARCANA LINK」とお願いします！',
-        'English / 日本語どちらでも大丈夫です。',
-        '平日は20時以降に合流できます。',
-      ],
-      times: ['12分前', '18分前', '35分前', '1時間前', '2時間前'],
-    },
-    en: {
-      names: ['Card Collector', 'White Moon', 'Lui', 'NorthStar', 'Stargazer'],
-      notes: [
-        'Online until around 10 PM tonight.',
-        'Happy to leave after the exchange.',
-        'Please mention “ARCANA LINK” in your request.',
-        'English or Japanese is fine.',
-        'Usually available after 8 PM on weekdays.',
-      ],
-      times: ['12 min ago', '18 min ago', '35 min ago', '1 hr ago', '2 hr ago'],
-    },
-    'zh-cn': {
-      names: ['圣牌收藏家', '白月', '小鹿', 'NorthStar', '逐星者'],
-      notes: [
-        '今晚22点左右之前都可以上线。',
-        '交换完成后可以直接结束联机。',
-        '申请时请注明“ARCANA LINK”。',
-        '可以使用中文或英文沟通。',
-        '工作日20点以后可以上线。',
-      ],
-      times: ['12分钟前', '18分钟前', '35分钟前', '1小时前', '2小时前'],
-    },
-  }[locale === 'ja' || locale === 'en' || locale === 'zh-cn' ? locale : 'en'];
-  const profiles = [
-    { wants: ['月'], offers: ['世界'], uid: '800123456', server: 'asia' },
-    { wants: ['皇帝'], offers: ['太陽'], uid: '812345670', server: 'asia' },
-    { wants: ['戦車'], offers: ['死神'], uid: '845670123', server: 'asia' },
-    { wants: ['愚者'], offers: ['星'], uid: '701234567', server: 'europe' },
-    { wants: ['女帝'], offers: ['正義'], uid: '912345678', server: 'america' },
-  ] satisfies Array<{
-    wants: ArcanaId[];
-    offers: ArcanaId[];
-    uid: string;
-    server: ServerRegion;
-  }>;
-  return profiles.map((profile, index) => ({
-    publicId: `sample-${index}`,
-    displayName: text.names[index],
-    uid: profile.uid,
-    server: profile.server,
-    note: text.notes[index],
-    status: index === 1 ? 'negotiating' : 'open',
-    locale,
-    inventory: inventoryWith(profile.wants, profile.offers),
-    updatedAt: text.times[index],
-    sample: true,
-  }));
-}
-
 function tokenValue() {
   const bytes = new Uint8Array(24);
   crypto.getRandomValues(bytes);
@@ -162,7 +92,7 @@ function countLabel(locale: SiteLocale, count: CardCount) {
         : copy.three;
 }
 
-const baseCollectionShareCopy = {
+const collectionShareCopy = {
   ja: {
     open: 'Xに共有',
     kicker: 'COLLECTION SHARE',
@@ -179,9 +109,6 @@ const baseCollectionShareCopy = {
     download: 'X用画像を保存',
     copied: '投稿文をコピー',
     copiedDone: '投稿文をコピーしました',
-    copyLink: 'リンクをコピー',
-    linkCopied: 'リンクをコピーしました',
-    nativeShare: 'ほかのアプリで共有',
     saved: 'X用画像を保存しました',
     fallback:
       'この端末では画像の自動添付に対応していないため、投稿画面を開きます。保存した画像を添えると、より目立ちます。',
@@ -204,9 +131,6 @@ const baseCollectionShareCopy = {
     download: 'Save image for X',
     copied: 'Copy post text',
     copiedDone: 'Post text copied',
-    copyLink: 'Copy trade link',
-    linkCopied: 'Trade link copied',
-    nativeShare: 'Share with another app',
     saved: 'Image saved for X',
     fallback:
       'Automatic image attachment is unavailable on this device. The X composer will open; attach the saved image for more impact.',
@@ -229,50 +153,19 @@ const baseCollectionShareCopy = {
     download: '保存X用图片',
     copied: '复制发布文案',
     copiedDone: '发布文案已复制',
-    copyLink: '复制交换链接',
-    linkCopied: '交换链接已复制',
-    nativeShare: '分享到其他应用',
     saved: 'X用图片已保存',
     fallback:
       '此设备不支持自动附加图片。将打开X发布页面；附上保存的图片会更醒目。',
     sharing: '正在生成图片…',
     privacy: '图片和发布文案不会包含UID或显示名称。',
   },
-} satisfies Record<'ja' | 'en' | 'zh-cn', Record<string, string>>;
-
-const collectionShareCopy: Record<SiteLocale, Record<string, string>> = {
-  ...baseCollectionShareCopy,
-  'zh-tw': {
-    ...baseCollectionShareCopy['zh-cn'],
-    open: '分享到X',
-    title: '分享你的收集進度',
-    copiedDone: '分享文字已複製',
-  },
-  ko: {
-    ...baseCollectionShareCopy.en,
-    open: 'X에 공유',
-    title: '컬렉션 공유',
-    copiedDone: '게시 문구 복사 완료',
-  },
-  es: {
-    ...baseCollectionShareCopy.en,
-    open: 'Compartir en X',
-    title: 'Comparte tu colección',
-    copiedDone: 'Texto copiado',
-  },
-  'pt-br': {
-    ...baseCollectionShareCopy.en,
-    open: 'Compartilhar no X',
-    title: 'Compartilhe sua coleção',
-    copiedDone: 'Texto copiado',
-  },
-};
+} satisfies Record<SiteLocale, Record<string, string>>;
 
 function replaceCount(value: string, count: number) {
   return value.replace('{count}', String(count));
 }
 
-const baseServerUiCopy = {
+const serverUiCopy = {
   ja: {
     chooseTitle: 'あなたの原神サーバーを選択してください',
     chooseLead: 'アルカナ交換は同じサーバーのユーザー同士でのみ行えます。',
@@ -342,31 +235,7 @@ const baseServerUiCopy = {
     alerts: '开启匹配提醒',
     language: '显示语言',
   },
-} satisfies Record<'ja' | 'en' | 'zh-cn', Record<string, string>>;
-
-const serverUiCopy: Record<SiteLocale, Record<string, string>> = {
-  ...baseServerUiCopy,
-  'zh-tw': {
-    ...baseServerUiCopy['zh-cn'],
-    chooseTitle: '請選擇你的伺服器',
-    chooseLead: '聖牌只能與同一伺服器的玩家交換。',
-  },
-  ko: {
-    ...baseServerUiCopy.en,
-    chooseTitle: '서버를 선택하세요',
-    chooseLead: '같은 서버의 플레이어끼리만 교환할 수 있습니다.',
-  },
-  es: {
-    ...baseServerUiCopy.en,
-    chooseTitle: 'Elige tu servidor',
-    chooseLead: 'Solo puedes intercambiar con jugadores del mismo servidor.',
-  },
-  'pt-br': {
-    ...baseServerUiCopy.en,
-    chooseTitle: 'Escolha seu servidor',
-    chooseLead: 'A troca só funciona entre jogadores do mesmo servidor.',
-  },
-};
+} satisfies Record<SiteLocale, Record<string, string>>;
 
 function replaceServerTokens(value: string, values: Record<string, string>) {
   return Object.entries(values).reduce(
@@ -407,7 +276,13 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
   const [reportReason, setReportReason] = useState('already_exchanged');
   const [token, setToken] = useState('');
   const [hydrated, setHydrated] = useState(false);
+  const [listingError, setListingError] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [shareMode, setShareMode] = useState<'local' | 'shared'>('local');
+  const [intent, setIntent] = useState<{slug:string; action:string} | null>(null);
+  const registerTracked = useRef(false);
+  const completeTracked = useRef(false);
+  const matchTracked = useRef('');
   const knownMatches = useRef<Set<string> | null>(null);
 
   const missing = useMemo(() => neededCards(inventory), [inventory]);
@@ -476,7 +351,11 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
       new URL(window.location.href).searchParams.get('server'),
     );
     if (urlServer) setRequestedServer(urlServer);
+    const params = new URL(window.location.href).searchParams;
+    const requestedCard = params.get('card');
+    if (requestedCard && Object.hasOwn(cardBySlug, requestedCard)) setIntent({slug:requestedCard,action:params.get('intent') === 'offer' ? 'offer' : 'want'});
     if (savedProfile) {
+      if (savedProfile.publicId) completeTracked.current = true;
       setProfile({
         ...savedProfile,
         server: savedServer ?? '',
@@ -486,7 +365,6 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
     }
     if (!savedServer) {
       setServerChoice(urlServer ?? '');
-      setServerOpen(true);
     }
     let savedToken = localStorage.getItem(storageKeys.token);
     if (!savedToken) {
@@ -524,17 +402,21 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
           profiles?: ExchangeProfile[];
           mode?: 'local' | 'shared';
         };
+        if (!response.ok) throw new Error('listing_unavailable');
         if (stopped) return;
+        setListingError(data.mode !== 'shared');
         setShareMode(data.mode === 'shared' ? 'shared' : 'local');
         if (data.mode === 'shared') {
           setProfiles(data.profiles ?? []);
         } else {
-          setProfiles(sampleProfiles(locale));
+          setProfiles([]);
+          setListingError(true);
         }
       } catch {
         if (!stopped) {
           setShareMode('local');
-          setProfiles(sampleProfiles(locale));
+          setProfiles([]);
+          setListingError(true);
         }
       }
     };
@@ -562,23 +444,33 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...profile, inventory, locale, token }),
         });
-        if (!response.ok) return;
+        if (!response.ok) throw new Error('save_failed');
         const data = (await response.json()) as {
           publicId?: string;
           mode?: 'local' | 'shared';
         };
-        if (data.mode === 'shared') setShareMode('shared');
+        if (data.mode === 'shared') {
+          setShareMode('shared');
+          setSaving(false);
+          setToast(copy.saved);
+          if (!completeTracked.current) {track('register_complete', {server:profile.server}); completeTracked.current = true;}
+        }
         if (data.publicId && data.publicId !== profile.publicId) {
           setProfile((current) => ({ ...current, publicId: data.publicId }));
         }
       } catch {
+        setSaving(false);
         setShareMode('local');
+        setToast(locale === 'ja' ? '公開保存に失敗しました。通信状態を確認してプロフィールを保存し直してください。' : 'Could not publish. Please retry saving your profile.');
       }
     }, 700);
     return () => window.clearTimeout(timer);
   }, [hydrated, inventory, locale, profile, token]);
 
   useEffect(() => {
+    const liveIds = matches.filter(m=>m.exact && !m.profile.sample).map(m=>m.profile.publicId).sort().join(',');
+    if (liveIds && liveIds !== matchTracked.current) track('match_found', {count:matches.filter(m=>m.exact && !m.profile.sample).length});
+    matchTracked.current = liveIds;
     const exactIds = new Set(
       matches
         .filter((match) => match.exact)
@@ -603,7 +495,11 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
     knownMatches.current = exactIds;
   }, [locale, matches, notifications]);
 
+  function startRegistration() {
+    if (!registerTracked.current) {track('register_start'); registerTracked.current = true;}
+  }
   function updateCount(card: ArcanaId, change: -1 | 1) {
+    startRegistration();
     if (!profile.server) {
       setServerOpen(true);
       return;
@@ -635,7 +531,8 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
       status: 'open',
     }));
     setProfileOpen(false);
-    setToast(shareMode === 'shared' ? copy.saved : copy.localSaved);
+    setSaving(true);
+    setToast(locale === 'ja' ? '公開募集を保存しています…' : 'Saving your listing…');
   }
 
   async function reportMatch() {
@@ -659,6 +556,7 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
   }
 
   function copyUid(uid: string) {
+    track('uid_copy');
     void navigator.clipboard.writeText(uid);
     setCopied(true);
     setToast(copy.uidCopiedNext);
@@ -666,6 +564,7 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
   }
 
   function openProfileSettings() {
+    startRegistration();
     if (!profile.server) {
       setServerOpen(true);
       return;
@@ -736,27 +635,8 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
   }
 
   function shareText() {
-    const status =
-      collected === 22
-        ? shareCopy.complete
-        : replaceCount(shareCopy.remaining, missing.length);
-    const duplicateLine = duplicates.length
-      ? summarizedNames(duplicates)
-      : shareCopy.noDuplicates;
-    const lines: Record<SiteLocale, string> = {
-      ja: `月諭アルカナ、現在 ${collected}/22種（${progress}%）✨\n${status}\n交換できる重複：${duplicateLine}`,
-      en: `My Lunar Arcana collection: ${collected}/22 (${progress}%) ✨\n${status}\nDuplicates to trade: ${duplicateLine}`,
-      'zh-cn': `我的月谕圣牌：${collected}/22（${progress}%）✨\n${status}\n可交换：${duplicateLine}`,
-      'zh-tw': `我的月諭聖牌：${collected}/22（${progress}%）✨\n${status}\n可交換：${duplicateLine}`,
-      ko: `나의 월의 아르카나: ${collected}/22 (${progress}%) ✨\n${status}\n교환 가능: ${duplicateLine}`,
-      es: `Mi colección de Arcanos Lunares: ${collected}/22 (${progress}%) ✨\n${status}\nDuplicados: ${duplicateLine}`,
-      'pt-br': `Minha coleção de Arcanos Lunares: ${collected}/22 (${progress}%) ✨\n${status}\nRepetidas: ${duplicateLine}`,
-    };
-    return `${lines[locale]}\n\n${shareCopy.challenge} 🔁\n#GenshinImpact #LunarArcana #ARCANALINK\n${shareUrl()}`;
-  }
-
-  function shareUrl() {
-    return `https://arcana-card-link.pages.dev${localizedPath(locale)}${profile.server ? `?server=${profile.server}` : ''}`;
+    const url = profile.publicId ? 'https://arcana-card-link.pages.dev/genshin-arcana/share/' + profile.publicId : 'https://arcana-card-link.pages.dev/genshin-arcana/exchange-table';
+    return ['【原神 月諭アルカナ交換】', '求：' + (missing.map(c=>labels[c]).join(' / ') || 'なし'), '譲：' + (duplicates.map(c=>labels[c]).join(' / ') || 'なし'), 'Server：' + activeServerLabel, '交換条件はこちら', url + '?utm_source=x&utm_medium=social&utm_campaign=exchange', '#原神 #アルカナ交換'].join('\n');
   }
 
   async function collectionImage() {
@@ -885,29 +765,45 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
   }
 
   async function postToX() {
+    track('share_x', {server:profile.server});
     const text = shareText();
-    window.open(
-      `https://x.com/intent/post?text=${encodeURIComponent(text)}`,
-      '_blank',
-      'noopener,noreferrer',
-    );
-  }
+    const supportsFileShare =
+      typeof navigator.share === 'function' &&
+      typeof navigator.canShare === 'function' &&
+      navigator.canShare({
+        files: [new File([''], 'arcana-link.png', { type: 'image/png' })],
+      });
+    if (!supportsFileShare) {
+      window.open(
+        `https://x.com/intent/post?text=${encodeURIComponent(text)}`,
+        '_blank',
+        'noopener,noreferrer',
+      );
+      setToast(shareCopy.fallback);
+      return;
+    }
 
-  async function copyShareLink() {
-    await navigator.clipboard.writeText(shareUrl());
-    setToast(shareCopy.linkCopied);
-  }
-
-  async function shareViaDevice() {
-    if (!navigator.share) return copyShareLink();
+    setShareBusy(true);
     try {
+      const blob = await collectionImage();
+      const file = new File([blob], `arcana-link-${collected}-of-22.png`, {
+        type: 'image/png',
+      });
       await navigator.share({
+        files: [file],
+        text,
         title: shareCopy.title,
-        text: shareText(),
-        url: shareUrl(),
       });
     } catch (error) {
-      if ((error as Error).name !== 'AbortError') await copyShareLink();
+      if ((error as Error).name !== 'AbortError') {
+        window.open(
+          `https://x.com/intent/post?text=${encodeURIComponent(text)}`,
+          '_blank',
+          'noopener,noreferrer',
+        );
+      }
+    } finally {
+      setShareBusy(false);
     }
   }
 
@@ -929,6 +825,7 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
           </span>
         </a>
         <nav aria-label="Main navigation">
+          <a href="/genshin-arcana/exchange-table">{locale === 'ja' ? '交換表' : locale === 'en' ? 'Exchange table' : '交换表'}</a>
           <a href="#inventory">{copy.inventory}</a>
           <a href="#matches">{copy.autoMatch}</a>
           <a href={localizedPath(locale, 'genshin-arcana')}>
@@ -946,7 +843,6 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
           <small>{serverCopy.change}</small>
         </button>
         <div className="language-switcher" aria-label="Language">
-          <span className="language-switcher-label">{serverCopy.language}</span>
           {languageLinks.map((link) => (
             <a
               className={link.locale === locale ? 'current' : ''}
@@ -954,7 +850,7 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
               hrefLang={localeInfo[link.locale].hreflang}
               key={link.locale}
             >
-              {localeShortLabel[link.locale]}
+              {link.locale === 'ja' ? 'JA' : link.locale === 'en' ? 'EN' : '中'}
             </a>
           ))}
         </div>
@@ -998,16 +894,18 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
           </div>
         )}
 
+      <div className="quality-intro"><p>{locale==='ja'?'所持数0枚は「求」、2枚以上は「譲」。同じサーバーで、お互いに不足を補える相手を探します。入力だけならUIDは不要です。':locale==='en'?'Enter your card counts to find two-way matches on your server. No UID is needed to edit your inventory.':'登记持有数量，寻找同服务器的双向交换伙伴。输入圣牌数量无需UID。'}</p><nav><a href={localizedPath(locale,'guide')}>{locale==='ja'?'使い方・マッチ判定の例':'How it works'}</a><a href={localizedPath(locale,'genshin-arcana')}>{locale==='ja'?'ゲーム内の交換手順':'Exchange guide'}</a></nav></div>
       <section className="v2-overview" aria-labelledby="collection-heading">
         <div className="v2-progress-card">
           <div className="v2-progress-head">
             <div>
               <span className="v2-kicker">MY COLLECTION</span>
-              <h1 id="collection-heading">{copy.inventory}</h1>
+              <h1 id="collection-heading">{locale === 'ja' ? '月諭のアルカナ交換相手を自動で探す' : locale === 'en' ? 'Find a Lunar Arcana trading partner' : '自动寻找月谕圣牌交换伙伴'}</h1>
               <p className="v2-same-server-lead">{copy.sameServerLead}</p>
             </div>
             <strong>{progress}%</strong>
           </div>
+          {!profile.publicId && collected === 0 && <div className="seo-empty"><p>{locale === 'ja' ? '未登録：まだカード情報が登録されていません。' : locale === 'en' ? 'No cards registered yet.' : '尚未登记圣牌。'}</p><a href="#inventory" onClick={()=>{startRegistration(); if (!profile.server) setServerOpen(true);}}>{locale === 'ja' ? '登録を始める' : locale === 'en' ? 'Start registration' : '开始登记'}</a></div>}
           <div className="v2-progress-track" aria-label={`${progress}%`}>
             <i style={{ width: `${progress}%` }} />
           </div>
@@ -1049,12 +947,12 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
           </div>
           <button
             className="v2-share-launch"
-            onClick={() => setShareOpen(true)}
+            onClick={() => {if (!profile.server) {setServerOpen(true); return;} track('exchange_table_create', {server:profile.server}); setShareOpen(true);}} 
             type="button"
           >
             <span>
               <Share2 size={20} />
-              <b>{shareCopy.open}</b>
+              <b>{locale === 'ja' ? '交換表を作る' : shareCopy.open}</b>
             </span>
             <small>
               {collected}/22 · {progress}% →
@@ -1108,7 +1006,9 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
         </aside>
       </section>
 
+      {saving && <p role="status">{locale==='ja'?'公開保存中…':'Saving…'}</p>}
       <section className="v2-inventory-section" id="inventory">
+        {intent && <div className="seo-empty"><p>{labels[cardBySlug[intent.slug].id]}：{locale === 'ja' ? (intent.action === 'offer' ? 'このカードを出せる方は、実際の所持数を2枚以上で入力してください。' : 'このカードを探す方は、所持数を0枚にしてください。') : 'Confirm your actual card count below.'}</p><p>{locale === 'ja' ? '他の21種類も確認すると、相互に条件の合う相手を探せます。' : 'Check all 22 counts to find a two-way match.'}</p></div>}
         <header className="v2-section-heading">
           <div>
             <span className="v2-kicker">01 · INVENTORY</span>
@@ -1222,7 +1122,7 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
                 key={match.profile.publicId}
               >
                 <div className="v2-match-score">
-                  <strong>{match.score}%</strong>
+                  <strong>{match.give.length} ↔ {match.receive.length}</strong>
                   <span>{match.exact ? copy.exact : copy.possible}</span>
                 </div>
                 <div className="v2-match-user">
@@ -1264,6 +1164,7 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
           </div>
         ) : (
           <div className="v2-empty">
+            {listingError && <p role="alert">{locale==='ja'?'募集を取得できませんでした。実際の募集状況は確認できていません。しばらくしてからページを再読み込みしてください。':'Listings are unavailable. Please reload later.'}</p>}
             <Bell size={24} />
             <p>
               {replaceServerTokens(serverCopy.zero, {
@@ -1311,13 +1212,12 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
           <a href={localizedPath(locale, 'privacy')}>
             {siteCopy.footerLinks[3]}
           </a>
-          <a href={localizedPath(locale, 'terms')}>{siteCopy.footerLinks[4]}</a>
+          <a href={localizedPath(locale, 'terms')}>{siteCopy.footerLinks[4]}</a><a href="/contact">{locale==='ja'?'お問い合わせ・訂正依頼':'Contact (JA)'}</a>
         </nav>
       </footer>
 
-      {(serverOpen || (hydrated && !profile.server)) && (
+      {serverOpen && (
         <div className="modal-backdrop v2-modal-backdrop">
-          {profile.server && (
             <button
               className="modal-dismiss"
               aria-label={copy.close}
@@ -1327,7 +1227,6 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
               }}
               type="button"
             />
-          )}
           <dialog
             className="dialog v2-dialog v2-server-dialog"
             open
@@ -1506,7 +1405,7 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
                   placeholder={siteCopy.notePlaceholder}
                 />
               </div>
-              <p className="v2-data-note">
+              <label className="contact-consent"><input type="checkbox" required/><span>{locale==='ja'?'表示名・UID・サーバー・所持数・メモを交換候補として公開することを確認しました。':locale==='en'?'I understand that my name, UID, server, inventory and note will be publicly visible.':'我已确认昵称、UID、服务器、圣牌数量和备注将公开显示。'}</span></label><p className="v2-data-note">
                 <ShieldCheck size={17} />
                 {copy.dataNote}
               </p>
@@ -1546,6 +1445,7 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
               </button>
             </header>
             <div className="v2-share-body">
+              <ExchangeTable inventory={inventory} server={profile.server} status={profile.status} publicId={(saving ? undefined : profile.publicId)} locale={locale} />
               <div className="v2-share-preview">
                 <div className="v2-share-brand">
                   <Sparkles size={18} />
@@ -1597,14 +1497,6 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
                   <Copy size={17} />
                   {shareCopy.copied}
                 </button>
-                <button onClick={() => void copyShareLink()} type="button">
-                  <Copy size={17} />
-                  {shareCopy.copyLink}
-                </button>
-                <button onClick={() => void shareViaDevice()} type="button">
-                  <Share2 size={17} />
-                  {shareCopy.nativeShare}
-                </button>
               </div>
               <p className="v2-share-privacy">
                 <ShieldCheck size={16} /> {shareCopy.privacy}
@@ -1629,7 +1521,7 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
           >
             <header className="dialog-head">
               <div>
-                <span className="v2-kicker">{selectedMatch.score}% MATCH</span>
+                <span className="v2-kicker">{selectedMatch.exact ? 'TWO-WAY MATCH' : 'ONE-WAY MATCH'}</span>
                 <h2 id="trade-title">{selectedMatch.profile.displayName}</h2>
               </div>
               <button

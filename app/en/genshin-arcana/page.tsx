@@ -1,8 +1,8 @@
-import { SeoGuidePage } from '@/components/international-seo-page';
-import { buildSeoPageMetadata } from '@/lib/international-seo';
+import { LocalizedPublicPage } from '@/components/localized-public-page';
+import { buildTranslatedPageMetadata } from '@/lib/site-metadata';
 
-export const metadata = buildSeoPageMetadata('en');
+export const metadata = buildTranslatedPageMetadata('en', 'genshin-arcana');
 
 export default function Page() {
-  return <SeoGuidePage locale="en" />;
+  return <LocalizedPublicPage locale="en" page="genshin-arcana" />;
 }

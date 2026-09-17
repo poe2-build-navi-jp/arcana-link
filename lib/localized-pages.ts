@@ -1,6 +1,6 @@
 import type { SiteLocale } from '@/lib/site-i18n';
 
-export type TranslatedLocale = Extract<SiteLocale, 'en' | 'zh-cn'>;
+export type TranslatedLocale = Exclude<SiteLocale, 'ja'>;
 export type PublicPageKey =
   | 'genshin-arcana'
   | 'guide'

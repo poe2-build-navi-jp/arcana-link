@@ -13,11 +13,7 @@ export default function RootLayout({
   return (
     <html lang="ja">
       <head>
-        <script
-          async
-          crossOrigin="anonymous"
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7738997902416481"
-        />
+        <meta name="google-adsense-account" content="ca-pub-7738997902416481" />
       </head>
       <body>{children}</body>
     </html>

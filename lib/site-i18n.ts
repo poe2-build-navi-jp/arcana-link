@@ -1,12 +1,4 @@
-export const siteLocales = [
-  'ja',
-  'en',
-  'zh-cn',
-  'zh-tw',
-  'ko',
-  'es',
-  'pt-br',
-] as const;
+export const siteLocales = ['ja', 'en', 'zh-cn'] as const;
 
 export type SiteLocale = (typeof siteLocales)[number];
 
@@ -112,119 +104,6 @@ const chineseCards: Record<ArcanaId, string> = {
   愚者: '愚者',
 };
 
-const traditionalChineseCards = Object.fromEntries(
-  Object.entries(chineseCards).map(([card, name]) => [
-    card,
-    (
-      {
-        魔法师: '魔法師',
-        女祭司: '女祭司',
-        女皇: '女皇',
-        圣职者: '聖職者',
-        恋人: '戀人',
-        战车: '戰車',
-        力量: '力量',
-        隐者: '隱者',
-        命运之轮: '命運之輪',
-        正义: '正義',
-        倒吊人: '倒吊人',
-        节制: '節制',
-        魔鬼: '魔鬼',
-        审判: '審判',
-        愚者: '愚者',
-      } as Record<string, string>
-    )[name] ?? name,
-  ]),
-) as Record<ArcanaId, string>;
-
-const koreanCards = Object.fromEntries(
-  arcanaIds.map((card, index) => [
-    card,
-    [
-      '마법사',
-      '여사제',
-      '여황제',
-      '황제',
-      '교황',
-      '연인',
-      '전차',
-      '힘',
-      '은둔자',
-      '운명의 수레바퀴',
-      '정의',
-      '매달린 사람',
-      '죽음',
-      '절제',
-      '악마',
-      '탑',
-      '별',
-      '달',
-      '태양',
-      '심판',
-      '세계',
-      '광대',
-    ][index],
-  ]),
-) as Record<ArcanaId, string>;
-const spanishCards = Object.fromEntries(
-  arcanaIds.map((card, index) => [
-    card,
-    [
-      'El Mago',
-      'La Sacerdotisa',
-      'La Emperatriz',
-      'El Emperador',
-      'El Hierofante',
-      'Los Enamorados',
-      'El Carro',
-      'La Fuerza',
-      'El Ermitaño',
-      'La Rueda de la Fortuna',
-      'La Justicia',
-      'El Colgado',
-      'La Muerte',
-      'La Templanza',
-      'El Diablo',
-      'La Torre',
-      'La Estrella',
-      'La Luna',
-      'El Sol',
-      'El Juicio',
-      'El Mundo',
-      'El Loco',
-    ][index],
-  ]),
-) as Record<ArcanaId, string>;
-const portugueseCards = Object.fromEntries(
-  arcanaIds.map((card, index) => [
-    card,
-    [
-      'O Mago',
-      'A Sacerdotisa',
-      'A Imperatriz',
-      'O Imperador',
-      'O Hierofante',
-      'Os Enamorados',
-      'O Carro',
-      'A Força',
-      'O Eremita',
-      'A Roda da Fortuna',
-      'A Justiça',
-      'O Enforcado',
-      'A Morte',
-      'A Temperança',
-      'O Diabo',
-      'A Torre',
-      'A Estrela',
-      'A Lua',
-      'O Sol',
-      'O Julgamento',
-      'O Mundo',
-      'O Louco',
-    ][index],
-  ]),
-) as Record<ArcanaId, string>;
-
 export const cardNames: Record<SiteLocale, Record<ArcanaId, string>> = {
   ja: Object.fromEntries(arcanaIds.map((card) => [card, card])) as Record<
     ArcanaId,
@@ -232,24 +111,12 @@ export const cardNames: Record<SiteLocale, Record<ArcanaId, string>> = {
   >,
   en: englishCards,
   'zh-cn': chineseCards,
-  'zh-tw': traditionalChineseCards,
-  ko: koreanCards,
-  es: spanishCards,
-  'pt-br': portugueseCards,
 };
 
 export const localeInfo = {
   ja: { htmlLang: 'ja', hreflang: 'ja', label: '日本語' },
   en: { htmlLang: 'en', hreflang: 'en', label: 'English' },
   'zh-cn': { htmlLang: 'zh-CN', hreflang: 'zh-CN', label: '简体中文' },
-  'zh-tw': { htmlLang: 'zh-TW', hreflang: 'zh-TW', label: '繁體中文' },
-  ko: { htmlLang: 'ko', hreflang: 'ko', label: '한국어' },
-  es: { htmlLang: 'es', hreflang: 'es', label: 'Español' },
-  'pt-br': {
-    htmlLang: 'pt-BR',
-    hreflang: 'pt-BR',
-    label: 'Português (Brasil)',
-  },
 } as const;
 
 export function localizedPath(locale: SiteLocale, path = '') {
@@ -263,11 +130,7 @@ export function languageAlternates(path = '') {
     ja: localizedPath('ja', path),
     en: localizedPath('en', path),
     'zh-CN': localizedPath('zh-cn', path),
-    'zh-TW': localizedPath('zh-tw', path),
-    ko: localizedPath('ko', path),
-    es: localizedPath('es', path),
-    'pt-BR': localizedPath('pt-br', path),
-    'x-default': localizedPath('en', path),
+    'x-default': localizedPath('ja', path),
   };
 }
 
@@ -322,7 +185,7 @@ export type HomeCopy = {
   toolDescription: string;
 };
 
-const baseHomeCopy = {
+export const homeCopy: Record<SiteLocale, HomeCopy> = {
   ja: {
     brandSubtitle: '22種カード交換所',
     nav: ['マッチング', '原神アルカナ', '交換ガイド', '22種一覧', '運営情報'],
@@ -523,93 +386,6 @@ const baseHomeCopy = {
     toolTitle: '创建月谕圣牌交换需求',
     toolDescription: '使用UID、服务器、想要和可提供的圣牌创建交换需求。',
   },
-} satisfies Record<'ja' | 'en' | 'zh-cn', HomeCopy>;
-
-export const homeCopy: Record<SiteLocale, HomeCopy> = {
-  ...baseHomeCopy,
-  'zh-tw': {
-    ...baseHomeCopy['zh-cn'],
-    brandSubtitle: '22種聖牌交換站',
-    nav: ['條件配對', '原神月諭聖牌', '交換指南', '22種聖牌一覽', '關於本站'],
-    heroLead: '告別不斷下沉的貼文，',
-    heroAccent: '找到真正符合的交換。',
-    heroDescription:
-      '登記持有與缺少的聖牌，自動找到同一伺服器且互相符合條件的玩家。',
-    yourConditions: '你的交換條件',
-    collecting: '你缺少的聖牌',
-    availableToTrade: '可交換的重複聖牌',
-    footerDescription: '協助完成22種月諭聖牌收藏的獨立交換配對工具。',
-  },
-  ko: {
-    ...baseHomeCopy.en,
-    brandSubtitle: '22종 카드 교환',
-    nav: [
-      '자동 매칭',
-      '원신 아르카나',
-      '교환 가이드',
-      '22종 목록',
-      '운영 정보',
-    ],
-    heroLead: '게시글을 찾지 말고,',
-    heroAccent: '맞는 교환을 바로 찾으세요.',
-    heroDescription:
-      '22종 보유 수량을 등록하면 같은 서버에서 서로 필요한 카드가 맞는 플레이어를 자동으로 찾습니다.',
-    yourConditions: '내 교환 조건',
-    collecting: '없는 카드',
-    availableToTrade: '교환 가능한 중복 카드',
-    footerDescription:
-      '22종 카드 컬렉션 완성을 돕는 독립 교환 매칭 도구입니다.',
-  },
-  es: {
-    ...baseHomeCopy.en,
-    brandSubtitle: 'Intercambio de 22 cartas',
-    nav: [
-      'Matching',
-      'Arcanos Lunares',
-      'Guía',
-      'Las 22 cartas',
-      'Información',
-    ],
-    heroLead: 'Deja atrás el tablón.',
-    heroAccent: 'Encuentra el intercambio correcto.',
-    heroDescription:
-      'Registra tus 22 cartas y encuentra automáticamente jugadores compatibles en el mismo servidor.',
-    yourConditions: 'Tus condiciones',
-    collecting: 'Cartas que te faltan',
-    availableToTrade: 'Duplicados disponibles',
-    footerDescription:
-      'Herramienta independiente para completar la colección de 22 Arcanos Lunares.',
-  },
-  'pt-br': {
-    ...baseHomeCopy.en,
-    brandSubtitle: 'Troca de 22 cartas',
-    nav: [
-      'Combinações',
-      'Arcanos Lunares',
-      'Guia',
-      'As 22 cartas',
-      'Informações',
-    ],
-    heroLead: 'Esqueça o mural.',
-    heroAccent: 'Encontre a troca certa.',
-    heroDescription:
-      'Cadastre suas 22 cartas e encontre automaticamente jogadores compatíveis no mesmo servidor.',
-    yourConditions: 'Suas condições',
-    collecting: 'Cartas que faltam',
-    availableToTrade: 'Repetidas disponíveis',
-    footerDescription:
-      'Ferramenta independente para completar a coleção de 22 Arcanos Lunares.',
-  },
-};
-
-export const localeShortLabel: Record<SiteLocale, string> = {
-  ja: 'JA',
-  en: 'EN',
-  'zh-cn': '简',
-  'zh-tw': '繁',
-  ko: 'KO',
-  es: 'ES',
-  'pt-br': 'PT',
 };
 
 export const languageLinks = siteLocales.map((locale) => ({

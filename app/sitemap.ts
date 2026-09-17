@@ -1,15 +1,9 @@
+import { readCardStats } from '@/lib/arcana-db';
 import type { MetadataRoute } from 'next';
-import { arcanaCards, englishCardSlugById } from '@/lib/arcana-cards';
-import { localizedPath, type SiteLocale } from '@/lib/site-i18n';
-import { serverPageSlugs } from '@/lib/international-seo';
+import { arcanaCards } from '@/lib/arcana-cards';
+import { localizedPath, siteLocales } from '@/lib/site-i18n';
 
 const base = 'https://arcana-card-link.pages.dev';
-
-// Keep the XML sitemap focused on the locales that currently have the most
-// complete, independently written public content. Other locales remain
-// accessible to users but are not pushed to Google until their editorial depth
-// is comparable.
-const searchLocales = ['ja', 'en', 'zh-cn'] as const satisfies readonly SiteLocale[];
 
 const paths = [
   '',
@@ -21,8 +15,10 @@ const paths = [
   'terms',
 ] as const;
 
-export default function sitemap(): MetadataRoute.Sitemap {
-  const mainPages = searchLocales.flatMap((locale) =>
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const available = await Promise.all(arcanaCards.map(async card=>({card,stats:await readCardStats(card.id)})));
+  const indexedCards=available.filter(item=>item.stats?.some(row=>row.wanting>0||row.offering>0)).map(item=>item.card);
+  const mainPages = siteLocales.flatMap((locale) =>
     paths.map((path) => ({
       url: `${base}${localizedPath(locale, path)}`,
       lastModified: new Date('2026-09-17'),
@@ -30,21 +26,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: path === '' ? 1 : path === 'genshin-arcana' ? 0.9 : 0.7,
     })),
   );
-  const cardPages = searchLocales.flatMap((locale) =>
-    arcanaCards.map((card) => ({
-      url: `${base}${localizedPath(locale, locale === 'en' ? `lunar-arcana/${englishCardSlugById[card.id]}` : `genshin-arcana/${card.slug}`)}`,
+  const cardPages = siteLocales.flatMap((locale) =>
+    indexedCards.map((card) => ({
+      url: `${base}${localizedPath(locale, `genshin-arcana/${card.slug}`)}`,
       lastModified: new Date('2026-09-17'),
       changeFrequency: 'daily' as const,
-      priority: 0.8,
+      priority: 0.75,
     })),
   );
-  const serverPages = searchLocales.flatMap((locale) =>
-    serverPageSlugs.map((slug) => ({
-      url: `${base}${localizedPath(locale, `genshin-arcana/${slug}`)}`,
-      lastModified: new Date('2026-09-17'),
-      changeFrequency: 'daily' as const,
-      priority: 0.8,
-    })),
-  );
-  return [...mainPages, ...serverPages, ...cardPages];
+  return [...mainPages, ...cardPages, {url:base+'/contact',lastModified:new Date('2026-09-17'),changeFrequency:'monthly',priority:0.3}, {url:base+'/genshin-arcana/exchange-table',lastModified:new Date('2026-09-17'),changeFrequency:'monthly',priority:0.8}];
 }

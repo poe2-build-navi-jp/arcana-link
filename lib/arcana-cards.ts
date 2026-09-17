@@ -38,34 +38,3 @@ export const cardBySlug = Object.fromEntries(
 export const cardSlugById = Object.fromEntries(
   arcanaCards.map((card) => [card.id, card.slug]),
 ) as Record<ArcanaId, string>;
-
-const englishSlugs = [
-  'the-magician',
-  'the-high-priestess',
-  'the-empress',
-  'the-emperor',
-  'the-hierophant',
-  'the-lovers',
-  'the-chariot',
-  'strength',
-  'the-hermit',
-  'wheel-of-fortune',
-  'justice',
-  'the-hanged-man',
-  'death',
-  'temperance',
-  'the-devil',
-  'the-tower',
-  'the-star',
-  'the-moon',
-  'the-sun',
-  'judgment',
-  'the-world',
-  'the-fool',
-] as const;
-export const englishCardSlugById = Object.fromEntries(
-  arcanaCards.map((card, index) => [card.id, englishSlugs[index]]),
-) as Record<ArcanaId, string>;
-export const cardByEnglishSlug = Object.fromEntries(
-  arcanaCards.map((card) => [englishCardSlugById[card.id], card]),
-) as Record<string, ArcanaCard>;

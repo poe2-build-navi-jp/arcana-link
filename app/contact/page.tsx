@@ -1,0 +1,5 @@
+import type {Metadata} from 'next';
+import {PublicHeader,PublicFooter} from '@/components/public-shell';
+import {ContactForm} from '@/components/contact-form';
+export const metadata:Metadata={title:'お問い合わせ・訂正依頼 | ARCANA LINK',description:'ARCANA LINKの掲載内容の訂正、不具合、安全上の問題を運営者に伝えるフォームです。',alternates:{canonical:'/contact'}};
+export default function Contact(){return <><PublicHeader/><main className="article-page"><header className="article-hero"><span>CONTACT</span><h1>お問い合わせ・訂正依頼</h1><p>ARCANA LINK運営へのご連絡を受け付けます。</p></header><article className="article-body"><section><h2>受け付ける内容</h2><p>ガイドの誤り、リンク切れ、操作できない箇所、迷惑行為などをお知らせください。対象ページと、問題が起きた手順が分かると確認しやすくなります。送信内容は公開されません。</p><p>メールアドレスを収集しないため、個別の返信はできません。ゲーム内のアカウント復旧や交換の仲介は行っていません。ゲーム自体の問題はゲーム内のお問い合わせをご利用ください。</p></section><ContactForm/><section><h2>送信前に確認できること</h2><ul><li><a href="/guide#trouble">保存・表示・マッチングの確認手順</a></li><li><a href="/genshin-arcana#cant-find-partner">交換相手が見つからないとき</a></li><li><a href="/about">運営情報と編集方針</a></li></ul></section></article></main><PublicFooter/></>}

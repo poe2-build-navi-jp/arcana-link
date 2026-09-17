@@ -15,15 +15,11 @@ const worker = {
       return response;
     }
 
-    const languages = {
-      en: 'en',
-      'zh-cn': 'zh-CN',
-      'zh-tw': 'zh-TW',
-      ko: 'ko',
-      es: 'es',
-      'pt-br': 'pt-BR',
-    };
-    const language = languages[pathname.split('/')[1]] ?? 'ja';
+    const language = pathname.startsWith('/en')
+      ? 'en'
+      : pathname.startsWith('/zh-cn')
+        ? 'zh-CN'
+        : 'ja';
 
     return new HTMLRewriter()
       .on('html', {

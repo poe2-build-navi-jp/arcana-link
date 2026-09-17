@@ -1,10 +1,10 @@
 /* oxlint-disable next/no-html-link-for-pages -- Native navigation avoids a vinext client-link runtime failure. */
 import { Sparkles } from '@/components/icons';
+import { EditorialAd } from '@/components/editorial-ad';
 import {
   homeCopy,
   languageLinks,
   localeInfo,
-  localeShortLabel,
   localizedPath,
   type SiteLocale,
 } from '@/lib/site-i18n';
@@ -23,11 +23,9 @@ function DocumentLanguage({ locale }: { locale: SiteLocale }) {
 export function PublicHeader({
   locale = 'ja',
   path = '',
-  languagePaths,
 }: {
   locale?: SiteLocale;
   path?: string;
-  languagePaths?: Partial<Record<SiteLocale, string>>;
 }) {
   const copy = homeCopy[locale];
   return (
@@ -64,20 +62,14 @@ export function PublicHeader({
             locale === 'zh-cn' ? '语言' : locale === 'en' ? 'Language' : '言語'
           }
         >
-          <span className="language-switcher-label">
-            {locale === 'en' ? 'Choose language' : 'Language'}
-          </span>
           {languageLinks.map((link) => (
             <a
               className={link.locale === locale ? 'current' : ''}
-              href={localizedPath(
-                link.locale,
-                languagePaths?.[link.locale] ?? path,
-              )}
+              href={localizedPath(link.locale, path)}
               hrefLang={localeInfo[link.locale].hreflang}
               key={link.locale}
             >
-              {localeShortLabel[link.locale]}
+              {link.locale === 'ja' ? 'JA' : link.locale === 'en' ? 'EN' : '中'}
             </a>
           ))}
         </div>
@@ -111,6 +103,7 @@ export function PublicFooter({ locale = 'ja' }: { locale?: SiteLocale }) {
         <a href={localizedPath(locale, 'about')}>{copy.footerLinks[2]}</a>
         <a href={localizedPath(locale, 'privacy')}>{copy.footerLinks[3]}</a>
         <a href={localizedPath(locale, 'terms')}>{copy.footerLinks[4]}</a>
+        <a href="/contact">{locale === 'ja' ? 'お問い合わせ・訂正依頼' : locale === 'en' ? 'Contact / corrections (JA)' : '联系与更正（日语）'}</a>
       </nav>
       <small>© 2026 ARCANA LINK</small>
     </footer>
@@ -124,7 +117,6 @@ export function ArticleShell({
   children,
   locale = 'ja',
   path = '',
-  languagePaths,
 }: {
   kicker: string;
   title: string;
@@ -132,11 +124,11 @@ export function ArticleShell({
   children: React.ReactNode;
   locale?: SiteLocale;
   path?: string;
-  languagePaths?: Partial<Record<SiteLocale, string>>;
 }) {
   return (
     <>
-      <PublicHeader locale={locale} path={path} languagePaths={languagePaths} />
+      <PublicHeader locale={locale} path={path} />
+      {locale === 'ja' && ['guide','genshin-arcana'].includes(path) && <EditorialAd/>}
       <main className="article-page" lang={localeInfo[locale].htmlLang}>
         <header className="article-hero">
           <span>{kicker}</span>

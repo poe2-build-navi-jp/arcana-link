@@ -23,30 +23,6 @@ export const serverLabels: Record<SiteLocale, Record<ServerRegion, string>> = {
     europe: '欧洲',
     tw_hk_mo: 'TW / HK / MO',
   },
-  'zh-tw': {
-    asia: '亞洲',
-    america: '美洲',
-    europe: '歐洲',
-    tw_hk_mo: '台港澳',
-  },
-  ko: {
-    asia: '아시아',
-    america: '아메리카',
-    europe: '유럽',
-    tw_hk_mo: '대만·홍콩·마카오',
-  },
-  es: {
-    asia: 'Asia',
-    america: 'América',
-    europe: 'Europa',
-    tw_hk_mo: 'TW / HK / MO',
-  },
-  'pt-br': {
-    asia: 'Ásia',
-    america: 'América',
-    europe: 'Europa',
-    tw_hk_mo: 'TW / HK / MO',
-  },
 };
 
 const legacyServerValues: Record<ServerRegion, string> = {

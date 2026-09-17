@@ -1,7 +1,10 @@
 /* oxlint-disable next/no-html-link-for-pages -- Native navigation avoids a vinext client-link runtime failure. */
 import { ArticleShell } from '@/components/public-shell';
-import { cardBySlug, englishCardSlugById } from '@/lib/arcana-cards';
-import { readProfiles } from '@/lib/arcana-db';
+import { cardBySlug, arcanaCards } from '@/lib/arcana-cards';
+import { readCardStats } from '@/lib/arcana-db';
+import { notFound } from 'next/navigation';
+import { serverRegions, serverLabels } from '@/lib/server-region';
+import { PageEvent } from '@/components/page-event';
 import { cardStructuredData } from '@/lib/card-seo';
 import {
   cardNames,
@@ -9,29 +12,26 @@ import {
   romans,
   type SiteLocale,
 } from '@/lib/site-i18n';
-import { serverLabels, serverRegions } from '@/lib/server-region';
 
 export async function CardExchangePage({
   locale,
   slug,
-  path,
 }: {
   locale: SiteLocale;
   slug: string;
-  path?: string;
 }) {
   const card = cardBySlug[slug];
-  if (!card) return null;
+  if (!Object.hasOwn(cardBySlug, slug) || !card) notFound();
   const index = Object.values(cardBySlug).findIndex(
     (item) => item.slug === slug,
   );
   const name = cardNames[locale][card.id];
-  const profiles = await readProfiles();
-  const wanting =
-    profiles?.filter((profile) => profile.inventory[card.id] === 0).length ?? 0;
-  const offering =
-    profiles?.filter((profile) => profile.inventory[card.id] >= 2).length ?? 0;
-  const baseCopy = {
+  const stats = await readCardStats(card.id);
+  const wanting = stats?.reduce((sum,row)=>sum+row.wanting,0) ?? null;
+  const offering = stats?.reduce((sum,row)=>sum+row.offering,0) ?? null;
+  const updated = stats?.map(row=>row.updated).sort().at(-1);
+  const ui = locale === 'ja' ? {collecting:'データ収集中',empty:'現在このカードの公開募集はありません。あなたが最初の募集者になれます。',shortage:'現在、このカードを出せる人を募集中です。',want:`${name}を探す`,offer:`${name}を出せる`,server:'サーバー別の公開募集',scope:'過去7日以内に更新された受付中の募集を集計。交渉中・終了・期限切れは含みません。人数は登録プロフィール数です。',updated:'最終更新',none:'まだ募集はありません',recent:'直近24時間に更新された募集',links:'交換を進める',guide:'交換ガイド',match:'自動マッチ',all:'22種類一覧',related:'ほかのカードの交換状況'} : locale === 'en' ? {collecting:'Collecting data',empty:'No public listings for this card yet. You can be the first.',shortage:'Players offering this card are needed.',want:`Find ${name}`,offer:`Offer ${name}`,server:'Listings by server',scope:'Open profiles updated within 7 days. Negotiating, closed and expired profiles are excluded. Counts represent profiles.',updated:'Last update',none:'No listings yet',recent:'Listings updated in the last 24 hours',links:'Continue trading',guide:'Exchange guide',match:'Auto matching',all:'All 22 cards',related:'Other cards'} : {collecting:'数据收集中',empty:'目前没有此圣牌的公开招募。你可以成为第一位。',shortage:'正在寻找可提供此圣牌的玩家。',want:`寻找${name}`,offer:`提供${name}`,server:'各服务器公开招募',scope:'统计7天内更新且可交换的个人资料，不含协商中、已结束或过期招募。人数代表资料数。',updated:'最后更新',none:'暂无招募',recent:'24小时内更新的招募',links:'继续交换',guide:'交换指南',match:'自动匹配',all:'22种圣牌',related:'其他圣牌'};
+  const copy = {
     ja: {
       kicker: '原神 月諭アルカナ交換',
       title: `「${name}」のアルカナ交換募集`,
@@ -98,112 +98,11 @@ export async function CardExchangePage({
       safetyText:
         '在游戏中搜索UID、发送好友申请，并再次确认双方圣牌。交换不需要密码、验证码或付款。',
     },
-  };
-  const internationalCopy = {
-    'zh-tw': {
-      kicker: '月諭聖牌交換',
-      title: `「${name}」月諭聖牌交換`,
-      lead: `尋找需要或可提供「${name}」的同伺服器玩家。`,
-      want: `正在尋找「${name}」`,
-      offer: `可提供「${name}」`,
-      heading: `如何交換取得「${name}」`,
-      intro: '登記22種聖牌的持有數量，系統會自動判定缺少與可交換的重複聖牌。',
-      examples: '交換條件',
-      points: ['確認同一伺服器', '確認雙方要交換的聖牌', '在遊戲內完成交換'],
-      action: '登記22種並尋找配對 →',
-      faq: `一直拿不到「${name}」怎麼辦？`,
-      faqText: '登記重複聖牌並等待互相符合條件的玩家。',
-      safety: '交換前確認',
-      safetyText: '不要提供密碼、驗證碼或金錢。',
-    },
-    ko: {
-      kicker: '월의 아르카나 교환',
-      title: `${name} 월의 아르카나 교환`,
-      lead: `${name} 카드를 필요로 하거나 제공하는 같은 서버 플레이어를 찾습니다.`,
-      want: `${name} 필요`,
-      offer: `${name} 제공`,
-      heading: `${name} 교환 방법`,
-      intro:
-        '22종 수량을 등록하면 없는 카드와 교환 가능한 중복 카드가 자동으로 계산됩니다.',
-      examples: '교환 조건',
-      points: ['같은 서버 확인', '두 카드 확인', '게임 안에서 교환 완료'],
-      action: '22종 등록하고 찾기 →',
-      faq: `${name} 카드가 나오지 않을 때`,
-      faqText: '중복 카드를 등록하고 상호 조건이 맞는 상대를 기다리세요.',
-      safety: '교환 전 확인',
-      safetyText: '비밀번호, 인증 코드, 결제는 필요하지 않습니다.',
-    },
-    es: {
-      kicker: 'INTERCAMBIO DE ARCANO LUNAR',
-      title: `Intercambio de ${name}`,
-      lead: `Encuentra jugadores de tu servidor que buscan u ofrecen ${name}.`,
-      want: `Buscan ${name}`,
-      offer: `Ofrecen ${name}`,
-      heading: `Cómo intercambiar ${name}`,
-      intro:
-        'Registra las 22 cartas para calcular automáticamente faltantes y duplicados disponibles.',
-      examples: 'Condiciones',
-      points: [
-        'Comprueba el servidor',
-        'Confirma ambas cartas',
-        'Completa el intercambio dentro del juego',
-      ],
-      action: 'Registrar las 22 cartas →',
-      faq: `¿No consigues ${name}?`,
-      faqText: 'Registra tus duplicados y espera una coincidencia recíproca.',
-      safety: 'Antes del intercambio',
-      safetyText: 'No compartas contraseñas, códigos ni dinero.',
-    },
-    'pt-br': {
-      kicker: 'TROCA DE ARCANO LUNAR',
-      title: `Troca de ${name}`,
-      lead: `Encontre jogadores do seu servidor que procuram ou oferecem ${name}.`,
-      want: `Procuram ${name}`,
-      offer: `Oferecem ${name}`,
-      heading: `Como trocar ${name}`,
-      intro:
-        'Cadastre as 22 cartas para calcular automaticamente as faltantes e repetidas disponíveis.',
-      examples: 'Condições',
-      points: [
-        'Confira o servidor',
-        'Confirme as duas cartas',
-        'Conclua a troca dentro do jogo',
-      ],
-      action: 'Cadastrar as 22 cartas →',
-      faq: `${name} não aparece?`,
-      faqText: 'Cadastre as repetidas e aguarde uma combinação recíproca.',
-      safety: 'Antes da troca',
-      safetyText: 'Não compartilhe senha, código ou dinheiro.',
-    },
-  } as const;
-  const copy =
-    locale === 'ja' || locale === 'en' || locale === 'zh-cn'
-      ? baseCopy[locale]
-      : internationalCopy[locale];
-  const pagePath = path ?? `genshin-arcana/${slug}`;
-  const distribution = {
-    ja: 'サーバー別の公開状況',
-    en: 'Live availability by server',
-    'zh-cn': '各服务器公开情况',
-    'zh-tw': '各伺服器公開狀況',
-    ko: '서버별 공개 현황',
-    es: 'Disponibilidad por servidor',
-    'pt-br': 'Disponibilidade por servidor',
   }[locale];
-  const structuredData = cardStructuredData(locale, slug, pagePath);
-  const languagePaths = {
-    ja: `genshin-arcana/${slug}`,
-    en: path?.startsWith('lunar-arcana/')
-      ? path
-      : `lunar-arcana/${englishCardSlugById[card.id]}`,
-    'zh-cn': `genshin-arcana/${slug}`,
-    'zh-tw': `genshin-arcana/${slug}`,
-    ko: `genshin-arcana/${slug}`,
-    es: `genshin-arcana/${slug}`,
-    'pt-br': `genshin-arcana/${slug}`,
-  } as const;
+  const structuredData = cardStructuredData(locale, slug);
   return (
     <>
+      <PageEvent event="card_page_view" card={slug}/>
       {structuredData && (
         <script
           type="application/ld+json"
@@ -215,8 +114,7 @@ export async function CardExchangePage({
         title={copy.title}
         lead={copy.lead}
         locale={locale}
-        path={pagePath}
-        languagePaths={languagePaths}
+        path={`genshin-arcana/${slug}`}
       >
         <section className="card-seo-summary">
           <div className="card-seo-symbol">
@@ -226,41 +124,26 @@ export async function CardExchangePage({
           </div>
           <div>
             <small>{copy.want}</small>
-            <strong>{wanting}</strong>
+            <strong>{wanting ?? ui.collecting}</strong>
           </div>
           <div>
             <small>{copy.offer}</small>
-            <strong>{offering}</strong>
+            <strong>{offering ?? ui.collecting}</strong>
           </div>
         </section>
         <section>
-          <h2>{distribution}</h2>
-          <div className="card-server-distribution">
-            {serverRegions.map((region) => {
-              const sameServer =
-                profiles?.filter((profile) => profile.server === region) ?? [];
-              const regionWanting = sameServer.filter(
-                (profile) => profile.inventory[card.id] === 0,
-              ).length;
-              const regionOffering = sameServer.filter(
-                (profile) => profile.inventory[card.id] >= 2,
-              ).length;
-              return (
-                <a
-                  href={localizedPath(
-                    locale,
-                    `genshin-arcana/${region === 'tw_hk_mo' ? 'tw-hk-mo' : region}`,
-                  )}
-                  key={region}
-                >
-                  <strong>{serverLabels[locale][region]}</strong>
-                  <span>
-                    {regionWanting} / {regionOffering}
-                  </span>
-                </a>
-              );
-            })}
-          </div>
+          <p>{ui.scope}</p>
+          {wanting === 0 && offering === 0 && <p className="seo-empty">{ui.empty}</p>}
+          {wanting !== null && wanting > 0 && offering === 0 && <p className="seo-empty">{ui.shortage}</p>}
+          <div className="seo-actions"><a className="card-seo-action" href={`${localizedPath(locale)}?card=${slug}&intent=want#inventory`}>{ui.want}</a><a className="card-seo-action" href={`${localizedPath(locale)}?card=${slug}&intent=offer#inventory`}>{ui.offer}</a></div>
+          <h2>{ui.server}</h2>
+          <div className="seo-table-wrap"><table className="seo-table"><thead><tr><th>Server</th><th>{copy.want}</th><th>{copy.offer}</th><th>{ui.updated}</th></tr></thead><tbody>{serverRegions.map(server=>{
+            const rows=stats?.filter(row=>row.server===server);
+            const last=rows?.map(row=>row.updated).sort().at(-1);
+            return <tr key={server}><th><a href={`${localizedPath(locale)}?server=${server}&card=${slug}#inventory`}>{serverLabels.en[server]}</a></th><td>{rows ? rows.reduce((sum,row)=>sum+row.wanting,0) : ui.collecting}</td><td>{rows ? rows.reduce((sum,row)=>sum+row.offering,0) : ui.collecting}</td><td>{last ? <time dateTime={last}>{new Date(last).toLocaleDateString(locale,{timeZone:'Asia/Tokyo'})}</time> : '—'}</td></tr>;
+          })}</tbody></table></div>
+          <p>{ui.recent}：{stats ? stats.reduce((sum,row)=>sum+row.recent,0) : ui.collecting}</p>
+          <p>{ui.updated}：{updated ? <time dateTime={updated}>{new Date(updated).toLocaleString(locale,{timeZone:'Asia/Tokyo'})} (JST)</time> : stats ? ui.none : ui.collecting}</p>
         </section>
         <section>
           <h2>{copy.heading}</h2>
@@ -288,6 +171,7 @@ export async function CardExchangePage({
           <h2>{copy.safety}</h2>
           <p>{copy.safetyText}</p>
         </section>
+        <section><h2>{ui.links}</h2><nav className="seo-actions"><a href={localizedPath(locale,'genshin-arcana')}>{ui.guide}</a><a href={`${localizedPath(locale)}#matches`}>{ui.match}</a><a href={localizedPath(locale,'arcana')}>{ui.all}</a></nav><h3>{ui.related}</h3><nav className="seo-actions">{[arcanaCards[(index+21)%22],arcanaCards[(index+1)%22],arcanaCards[(index+11)%22]].map(related=><a key={related.slug} href={localizedPath(locale,`genshin-arcana/${related.slug}`)}>{cardNames[locale][related.id]}</a>)}</nav></section>
       </ArticleShell>
     </>
   );

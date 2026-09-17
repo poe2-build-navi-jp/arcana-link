@@ -1,44 +1,14 @@
 import { CardExchangePage } from '@/components/card-exchange-page';
 import { buildCardMetadata, cardStaticParams } from '@/lib/card-seo';
-import { cardBySlug, englishCardSlugById } from '@/lib/arcana-cards';
-import {
-  SeoGuidePage,
-  ServerSeoPage,
-} from '@/components/international-seo-page';
-import {
-  buildSeoPageMetadata,
-  isSeoTopic,
-  isServerPageSlug,
-  seoTopicSlugs,
-  serverPageSlugs,
-} from '@/lib/international-seo';
 
-export const generateStaticParams = () => [
-  ...cardStaticParams,
-  ...seoTopicSlugs.map((slug) => ({ slug })),
-  ...serverPageSlugs.map((slug) => ({ slug })),
-];
+export const generateStaticParams = () => cardStaticParams;
 
 export async function generateMetadata({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }) {
-  const { slug } = await params;
-  if (isSeoTopic(slug)) {
-    return {
-      ...buildSeoPageMetadata('en', slug),
-      robots: { index: false, follow: true },
-    };
-  }
-  return isServerPageSlug(slug)
-    ? buildSeoPageMetadata('en', slug)
-    : buildCardMetadata(
-        'en',
-        slug,
-        `lunar-arcana/${cardBySlug[slug] ? englishCardSlugById[cardBySlug[slug].id] : slug}`,
-        true,
-      );
+  return buildCardMetadata('en', (await params).slug);
 }
 
 export default async function EnglishCardPage({
@@ -46,17 +16,5 @@ export default async function EnglishCardPage({
 }: {
   params: Promise<{ slug: string }>;
 }) {
-  const { slug } = await params;
-  if (isSeoTopic(slug)) return <SeoGuidePage locale="en" slug={slug} />;
-  if (isServerPageSlug(slug)) return <ServerSeoPage locale="en" slug={slug} />;
-  const englishSlug = cardBySlug[slug]
-    ? englishCardSlugById[cardBySlug[slug].id]
-    : slug;
-  return (
-    <CardExchangePage
-      locale="en"
-      slug={slug}
-      path={`lunar-arcana/${englishSlug}`}
-    />
-  );
+  return <CardExchangePage locale="en" slug={(await params).slug} />;
 }

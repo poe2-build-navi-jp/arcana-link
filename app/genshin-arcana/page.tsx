@@ -1,11 +1,10 @@
 /* oxlint-disable next/no-html-link-for-pages -- Native navigation avoids a vinext client-link runtime failure. */
 import type { Metadata } from 'next';
 import { ArticleShell } from '@/components/public-shell';
-import { arcanaCards } from '@/lib/arcana-cards';
 import { languageAlternates } from '@/lib/site-i18n';
 
 export const metadata: Metadata = {
-  title: '原神のアルカナ交換・募集の探し方 | ARCANA LINK',
+  title: '原神 月諭アルカナ交換のやり方｜募集・相手の探し方 | ARCANA LINK',
   description:
     '原神の月諭アルカナの交換相手を探す方法を解説。欲しいアルカナ、出せるアルカナ、サーバー、UIDから条件の合う相手を見つけられます。',
   alternates: {
@@ -14,7 +13,7 @@ export const metadata: Metadata = {
   },
   robots: { index: true, follow: true },
   openGraph: {
-    title: '原神のアルカナ交換・募集の探し方',
+    title: '原神 月諭アルカナ交換のやり方｜募集・相手の探し方',
     description:
       '月諭アルカナの交換条件を整理し、相手を探すための実用ガイドです。',
     type: 'article',
@@ -41,18 +40,11 @@ const faq = [
   },
 ];
 
-const servers = [
-  ['asia', 'Asia'],
-  ['america', 'America'],
-  ['europe', 'Europe'],
-  ['tw-hk-mo', 'TW / HK / MO'],
-] as const;
-
 export default function GenshinArcana() {
   const structuredData = {
     '@context': 'https://schema.org',
     '@type': 'Article',
-    headline: '原神のアルカナ交換・募集の探し方',
+    headline: '原神 月諭アルカナ交換のやり方｜募集・相手の探し方',
     description:
       '原神の月諭アルカナ交換をする前に必要な準備と、条件の合う相手の探し方を解説します。',
     datePublished: '2026-09-05',
@@ -69,7 +61,7 @@ export default function GenshinArcana() {
       />
       <ArticleShell
         kicker="GENSHIN ARCANA GUIDE"
-        title="原神のアルカナ交換・募集の探し方"
+        title="原神 月諭のアルカナ交換方法"
         lead="月諭のアルカナで欲しい一枚を探したい人へ。交換前の準備、条件の登録、実際にフレンドと交換するまでの流れをまとめました。"
         path="genshin-arcana"
       >
@@ -78,10 +70,8 @@ export default function GenshinArcana() {
           <a href="#what">原神の月諭アルカナとは</a>
           <a href="#before">交換相手を探す前に確認すること</a>
           <a href="#find">アルカナ交換の募集を探す方法</a>
-          <a href="#cards">22種類から交換相手を探す</a>
-          <a href="#servers">サーバー別に交換相手を探す</a>
           <a href="#steps">交換完了までの手順</a>
-          <a href="#faq">よくある質問</a>
+          <a href="#cant-find-partner">相手が見つからないとき</a><a href="#uid">UIDとサーバー</a><a href="#complete-guide">22種類の整理</a><a href="#faq">よくある質問</a>
         </nav>
         <section id="what">
           <h2>原神の月諭アルカナとは</h2>
@@ -142,31 +132,6 @@ export default function GenshinArcana() {
             <a href="/">アルカナ交換のマッチングを開く →</a>
           </p>
         </section>
-        <section id="cards">
-          <h2>22種類のアルカナから交換相手を探す</h2>
-          <p>
-            欲しいカードが決まっている場合は、カードごとの専用ページから現在探している人・交換に出せる人の公開状況を確認できます。実際の登録データがない場合は0件として表示し、架空の募集数は表示しません。
-          </p>
-          <div className="seo-link-grid">
-            {arcanaCards.map((card) => (
-              <a href={`/genshin-arcana/${card.slug}`} key={card.id}>
-                <strong>{card.symbol} {card.id}</strong>
-                <span>{card.id}の交換募集を見る</span>
-              </a>
-            ))}
-          </div>
-        </section>
-        <section id="servers">
-          <h2>サーバー別にアルカナ交換相手を探す</h2>
-          <p>
-            アルカナ交換は同じサーバーのプレイヤー同士で行うため、最初に自分のサーバーを確認してください。各ページでは公開中の登録データから需要・供給状況を確認できます。
-          </p>
-          <div className="seo-server-links">
-            {servers.map(([slug, label]) => (
-              <a href={`/genshin-arcana/${slug}`} key={slug}>{label}</a>
-            ))}
-          </div>
-        </section>
         <section id="steps">
           <h2>フレンドとアルカナを交換する手順</h2>
           <p>
@@ -176,6 +141,15 @@ export default function GenshinArcana() {
             パスワードや認証コードは交換に必要ありません。これらの情報を求められた場合は交換を中止し、アカウントの安全を優先してください。
           </p>
         </section>
+        <section id="cant-find-partner">
+          <h2>交換相手が見つからないときの確認順</h2>
+          <p>まずサーバーを確認し、次に所持数をゲーム内の最新状態に合わせてください。欲しいカードが相手にあっても、相手の欲しいカードを自分が出せなければ完全マッチにはなりません。</p>
+          <ol><li>「求」は0枚、「譲」は2枚以上として入力する。</li><li>同じサーバーの募集で、双方が渡せるカードを確認する。</li><li>公開募集を更新する。7日以上更新のない募集は候補から外れます。</li><li>交換表をXやnoteから共有して、自分の条件に合う人を募る。</li></ol>
+          <p>募集がないときは、成立を保証する数字やサンプルを実際の相手と見なさず、新しい募集を待ちましょう。</p>
+          <a href="/genshin-arcana/exchange-table">求・譲の交換表を作る →</a>
+        </section>
+        <section id="uid"><h2>UIDとサーバーを安全に伝える</h2><p>UIDは原神内で相手を検索するために使います。言語設定からサーバーを推測せず、ゲーム内の表示を確認してください。共有URL・X本文・交換表の画像にはUIDを含めません。公開募集への登録時のみ、交換相手にUIDが表示されることを確認して保存してください。</p></section>
+        <section id="complete-guide"><h2>22種類コンプリートに向けた所持数の整理</h2><p>1枚だけ持っているカードはコレクション用として残し、2枚以上ある種類を交換候補にします。交換が完了したら、渡した種類を減らし、受け取った種類を増やして再確認しましょう。未所持が減るほど条件が限定されるので、足りないカードの個別ページからサーバー別の募集状況も確認できます。</p><a href="/arcana">22種類一覧から不足カードを見る →</a></section>
         <section id="faq">
           <h2>原神のアルカナ交換に関するよくある質問</h2>
           <div className="faq">

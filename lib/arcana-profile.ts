@@ -18,8 +18,6 @@ export type ExchangeProfile = {
   sample?: boolean;
 };
 
-// Start from an empty, unregistered collection. Do not seed a demo inventory that
-// can be mistaken for the visitor's real collection state.
 export const defaultInventory = Object.fromEntries(
   arcanaIds.map((card) => [card, 0]),
 ) as InventoryCounts;
