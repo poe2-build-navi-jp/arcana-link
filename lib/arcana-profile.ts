@@ -18,16 +18,11 @@ export type ExchangeProfile = {
   sample?: boolean;
 };
 
+// Start from an empty, unregistered collection. Do not seed a demo inventory that
+// can be mistaken for the visitor's real collection state.
 export const defaultInventory = Object.fromEntries(
-  arcanaIds.map((card) => [card, 1]),
+  arcanaIds.map((card) => [card, 0]),
 ) as InventoryCounts;
-
-for (const card of ['世界', '太陽', '死神', '正義', '星'] as ArcanaId[]) {
-  defaultInventory[card] = 0;
-}
-defaultInventory.月 = 3;
-defaultInventory.皇帝 = 2;
-defaultInventory.戦車 = 3;
 
 export function normalizeInventory(value: unknown): InventoryCounts | null {
   if (!value || typeof value !== 'object') return null;
