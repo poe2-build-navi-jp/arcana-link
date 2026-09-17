@@ -1,6 +1,7 @@
 /* oxlint-disable next/no-html-link-for-pages -- Native navigation avoids a vinext client-link runtime failure. */
 import type { Metadata } from 'next';
 import { ArticleShell } from '@/components/public-shell';
+import { arcanaCards } from '@/lib/arcana-cards';
 import { languageAlternates } from '@/lib/site-i18n';
 
 export const metadata: Metadata = {
@@ -40,6 +41,13 @@ const faq = [
   },
 ];
 
+const servers = [
+  ['asia', 'Asia'],
+  ['america', 'America'],
+  ['europe', 'Europe'],
+  ['tw-hk-mo', 'TW / HK / MO'],
+] as const;
+
 export default function GenshinArcana() {
   const structuredData = {
     '@context': 'https://schema.org',
@@ -48,7 +56,7 @@ export default function GenshinArcana() {
     description:
       '原神の月諭アルカナ交換をする前に必要な準備と、条件の合う相手の探し方を解説します。',
     datePublished: '2026-09-05',
-    dateModified: '2026-09-06',
+    dateModified: '2026-09-17',
     author: { '@type': 'Organization', name: 'ARCANA LINK運営' },
     publisher: { '@type': 'Organization', name: 'ARCANA LINK' },
     mainEntityOfPage: 'https://arcana-card-link.pages.dev/genshin-arcana',
@@ -70,6 +78,8 @@ export default function GenshinArcana() {
           <a href="#what">原神の月諭アルカナとは</a>
           <a href="#before">交換相手を探す前に確認すること</a>
           <a href="#find">アルカナ交換の募集を探す方法</a>
+          <a href="#cards">22種類から交換相手を探す</a>
+          <a href="#servers">サーバー別に交換相手を探す</a>
           <a href="#steps">交換完了までの手順</a>
           <a href="#faq">よくある質問</a>
         </nav>
@@ -132,6 +142,31 @@ export default function GenshinArcana() {
             <a href="/">アルカナ交換のマッチングを開く →</a>
           </p>
         </section>
+        <section id="cards">
+          <h2>22種類のアルカナから交換相手を探す</h2>
+          <p>
+            欲しいカードが決まっている場合は、カードごとの専用ページから現在探している人・交換に出せる人の公開状況を確認できます。実際の登録データがない場合は0件として表示し、架空の募集数は表示しません。
+          </p>
+          <div className="seo-link-grid">
+            {arcanaCards.map((card) => (
+              <a href={`/genshin-arcana/${card.slug}`} key={card.id}>
+                <strong>{card.symbol} {card.id}</strong>
+                <span>{card.id}の交換募集を見る</span>
+              </a>
+            ))}
+          </div>
+        </section>
+        <section id="servers">
+          <h2>サーバー別にアルカナ交換相手を探す</h2>
+          <p>
+            アルカナ交換は同じサーバーのプレイヤー同士で行うため、最初に自分のサーバーを確認してください。各ページでは公開中の登録データから需要・供給状況を確認できます。
+          </p>
+          <div className="seo-server-links">
+            {servers.map(([slug, label]) => (
+              <a href={`/genshin-arcana/${slug}`} key={slug}>{label}</a>
+            ))}
+          </div>
+        </section>
         <section id="steps">
           <h2>フレンドとアルカナを交換する手順</h2>
           <p>
@@ -159,7 +194,7 @@ export default function GenshinArcana() {
             LINK運営が独自に整理したものです。第三者の画像、ロゴ、音楽、物語文、キャラクター素材は掲載していません。当サイトは非公式であり、対象ゲームの開発・運営会社とは関係ありません。
           </p>
         </section>
-        <p className="updated">公開日：2026年9月5日 / 最終更新：2026年9月6日</p>
+        <p className="updated">公開日：2026年9月5日 / 最終更新：2026年9月17日</p>
       </ArticleShell>
     </>
   );
