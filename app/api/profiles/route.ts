@@ -15,14 +15,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'server_required' }, { status: 400 });
   }
   const profiles = await readProfiles(server);
-  if (!profiles) {
-    return NextResponse.json(
-      { profiles: [], mode: 'local' },
-      { headers: { 'Cache-Control': 'no-store' } },
-    );
-  }
+  // Never fall back to invented/sample listings. If the shared store is
+  // unavailable, return an honest empty result so visitors can distinguish
+  // real public listings from a demo state.
   return NextResponse.json(
-    { profiles, mode: 'shared' },
+    { profiles: profiles ?? [], mode: 'shared' },
     { headers: { 'Cache-Control': 'no-store' } },
   );
 }
