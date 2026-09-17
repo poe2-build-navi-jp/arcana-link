@@ -13,6 +13,7 @@ import {
 } from '@/lib/site-i18n';
 
 const base = 'https://arcana-card-link.pages.dev';
+const indexedLocales = new Set<SiteLocale>(['ja', 'en', 'zh-cn']);
 
 export const cardStaticParams = arcanaCards.map((card) => ({
   slug: card.slug,
@@ -84,7 +85,7 @@ export function buildCardMetadata(
       canonical,
       languages: cardAlternates(slug),
     },
-    robots: { index: !legacy, follow: true },
+    robots: { index: !legacy && indexedLocales.has(locale), follow: true },
     openGraph: {
       type: 'article',
       title: content.title,
@@ -120,7 +121,7 @@ export function cardStructuredData(
     headline,
     inLanguage: localeInfo[locale].htmlLang,
     datePublished: '2026-09-06',
-    dateModified: '2026-09-06',
+    dateModified: '2026-09-17',
     author: { '@type': 'Organization', name: 'ARCANA LINK' },
     publisher: { '@type': 'Organization', name: 'ARCANA LINK' },
     mainEntityOfPage: `${base}${localizedPath(locale, pathOverride ?? `genshin-arcana/${slug}`)}`,
