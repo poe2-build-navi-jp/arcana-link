@@ -352,6 +352,11 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
     );
     if (urlServer) setRequestedServer(urlServer);
     const params = new URL(window.location.href).searchParams;
+    const wantSlugs = new Set((params.get('want') || '').split(',').filter(slug=>Object.hasOwn(cardBySlug,slug)));
+    const offerSlugs = new Set((params.get('offer') || '').split(',').filter(slug=>Object.hasOwn(cardBySlug,slug)));
+    if (params.has('want') || params.has('offer')) {
+      setInventory(Object.fromEntries(arcanaCards.map(card=>[card.id,wantSlugs.has(card.slug)?0:offerSlugs.has(card.slug)?2:1])) as InventoryCounts);
+    }
     const requestedCard = params.get('card');
     if (requestedCard && Object.hasOwn(cardBySlug, requestedCard)) setIntent({slug:requestedCard,action:params.get('intent') === 'offer' ? 'offer' : 'want'});
     if (savedProfile) {
@@ -900,7 +905,7 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
           <div className="v2-progress-head">
             <div>
               <span className="v2-kicker">MY COLLECTION</span>
-              <h1 id="collection-heading">{locale === 'ja' ? '月諭のアルカナ交換相手を自動で探す' : locale === 'en' ? 'Find a Lunar Arcana trading partner' : '自动寻找月谕圣牌交换伙伴'}</h1>
+              <h1 id="collection-heading">{locale === 'ja' ? '原神 月諭アルカナ交換マッチング' : locale === 'en' ? 'Find a Lunar Arcana trading partner' : '自动寻找月谕圣牌交换伙伴'}</h1>
               <p className="v2-same-server-lead">{copy.sameServerLead}</p>
             </div>
             <strong>{progress}%</strong>

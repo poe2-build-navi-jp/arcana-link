@@ -30,7 +30,7 @@ export async function CardExchangePage({
   const wanting = stats?.reduce((sum,row)=>sum+row.wanting,0) ?? null;
   const offering = stats?.reduce((sum,row)=>sum+row.offering,0) ?? null;
   const updated = stats?.map(row=>row.updated).sort().at(-1);
-  const ui = locale === 'ja' ? {collecting:'データ収集中',empty:'現在このカードの公開募集はありません。あなたが最初の募集者になれます。',shortage:'現在、このカードを出せる人を募集中です。',want:`${name}を探す`,offer:`${name}を出せる`,server:'サーバー別の公開募集',scope:'過去7日以内に更新された受付中の募集を集計。交渉中・終了・期限切れは含みません。人数は登録プロフィール数です。',updated:'最終更新',none:'まだ募集はありません',recent:'直近24時間に更新された募集',links:'交換を進める',guide:'交換ガイド',match:'自動マッチ',all:'22種類一覧',related:'ほかのカードの交換状況'} : locale === 'en' ? {collecting:'Collecting data',empty:'No public listings for this card yet. You can be the first.',shortage:'Players offering this card are needed.',want:`Find ${name}`,offer:`Offer ${name}`,server:'Listings by server',scope:'Open profiles updated within 7 days. Negotiating, closed and expired profiles are excluded. Counts represent profiles.',updated:'Last update',none:'No listings yet',recent:'Listings updated in the last 24 hours',links:'Continue trading',guide:'Exchange guide',match:'Auto matching',all:'All 22 cards',related:'Other cards'} : {collecting:'数据收集中',empty:'目前没有此圣牌的公开招募。你可以成为第一位。',shortage:'正在寻找可提供此圣牌的玩家。',want:`寻找${name}`,offer:`提供${name}`,server:'各服务器公开招募',scope:'统计7天内更新且可交换的个人资料，不含协商中、已结束或过期招募。人数代表资料数。',updated:'最后更新',none:'暂无招募',recent:'24小时内更新的招募',links:'继续交换',guide:'交换指南',match:'自动匹配',all:'22种圣牌',related:'其他圣牌'};
+  const ui = locale === 'ja' ? {collecting:'データ収集中',noWanting:`現在「${name}」の公開募集はありません。${name}を探している場合は、所持状況を登録すると交換募集に参加できます。`,noOffering:`現在「${name}」を交換に出せる公開ユーザーはいません。2枚以上持っている場合は、交換候補として登録できます。`,want:`${name}を探す`,offer:`${name}を出せる`,server:'サーバー別の公開募集',scope:'過去7日以内に更新された受付中の募集を集計。交渉中・終了・期限切れは含みません。人数は登録プロフィール数です。',updated:'最終更新',dataset:'ARCANA LINK登録データ',none:'まだ募集はありません',recent:'直近24時間に更新された募集',links:'交換を進める',guide:'交換ガイド',match:'自動マッチ',all:'22種類一覧',related:'ほかのカードの交換状況'} : locale === 'en' ? {collecting:'Collecting data',noWanting:`There are no public listings seeking ${name}. Register your collection to join.`,noOffering:`No public user is currently offering ${name}. Register it if you have two or more copies.`,want:`Find ${name}`,offer:`Offer ${name}`,server:'Listings by server',scope:'Open profiles updated within 7 days. Negotiating, closed and expired profiles are excluded. Counts represent profiles.',updated:'Last update',dataset:'ARCANA LINK listing data',none:'No listings yet',recent:'Listings updated in the last 24 hours',links:'Continue trading',guide:'Exchange guide',match:'Auto matching',all:'All 22 cards',related:'Other cards'} : {collecting:'数据收集中',noWanting:`目前没有寻找“${name}”的公开招募。登记持有情况即可参加。`,noOffering:`目前没有可提供“${name}”的公开用户。持有2张以上时可以登记。`,want:`寻找${name}`,offer:`提供${name}`,server:'各服务器公开招募',scope:'统计7天内更新且可交换的个人资料，不含协商中、已结束或过期招募。人数代表资料数。',updated:'最后更新',dataset:'ARCANA LINK登记数据',none:'暂无招募',recent:'24小时内更新的招募',links:'继续交换',guide:'交换指南',match:'自动匹配',all:'22种圣牌',related:'其他圣牌'};
   const copy = {
     ja: {
       kicker: '原神 月諭アルカナ交換',
@@ -133,8 +133,8 @@ export async function CardExchangePage({
         </section>
         <section>
           <p>{ui.scope}</p>
-          {wanting === 0 && offering === 0 && <p className="seo-empty">{ui.empty}</p>}
-          {wanting !== null && wanting > 0 && offering === 0 && <p className="seo-empty">{ui.shortage}</p>}
+          {wanting === 0 && <p className="seo-empty">{ui.noWanting}</p>}
+          {offering === 0 && <p className="seo-empty">{ui.noOffering}</p>}
           <div className="seo-actions"><a className="card-seo-action" href={`${localizedPath(locale)}?card=${slug}&intent=want#inventory`}>{ui.want}</a><a className="card-seo-action" href={`${localizedPath(locale)}?card=${slug}&intent=offer#inventory`}>{ui.offer}</a></div>
           <h2>{ui.server}</h2>
           <div className="seo-table-wrap"><table className="seo-table"><thead><tr><th>Server</th><th>{copy.want}</th><th>{copy.offer}</th><th>{ui.updated}</th></tr></thead><tbody>{serverRegions.map(server=>{
@@ -143,7 +143,7 @@ export async function CardExchangePage({
             return <tr key={server}><th><a href={`${localizedPath(locale)}?server=${server}&card=${slug}#inventory`}>{serverLabels.en[server]}</a></th><td>{rows ? rows.reduce((sum,row)=>sum+row.wanting,0) : ui.collecting}</td><td>{rows ? rows.reduce((sum,row)=>sum+row.offering,0) : ui.collecting}</td><td>{last ? <time dateTime={last}>{new Date(last).toLocaleDateString(locale,{timeZone:'Asia/Tokyo'})}</time> : '—'}</td></tr>;
           })}</tbody></table></div>
           <p>{ui.recent}：{stats ? stats.reduce((sum,row)=>sum+row.recent,0) : ui.collecting}</p>
-          <p>{ui.updated}：{updated ? <time dateTime={updated}>{new Date(updated).toLocaleString(locale,{timeZone:'Asia/Tokyo'})} (JST)</time> : stats ? ui.none : ui.collecting}</p>
+          <p><strong>{ui.dataset}</strong><br/>{ui.updated}：{updated ? <time dateTime={updated}>{new Date(updated).toLocaleString(locale,{timeZone:'Asia/Tokyo'})} (JST)</time> : stats ? ui.none : ui.collecting}</p>
         </section>
         <section>
           <h2>{copy.heading}</h2>

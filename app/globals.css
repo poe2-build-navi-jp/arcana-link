@@ -2782,8 +2782,15 @@ footer > span {
 .exchange-table dl { display: grid; grid-template-columns: 3rem minmax(0,1fr); gap: 12px; margin: 18px 0; line-height: 1.8; }
 .exchange-table dd { margin: 0; }
 .exchange-table input { max-width: 100%; width: 100%; padding: 10px; font-size: 14px; }
+.exchange-table-builder > label { display: block; margin: 12px 0 6px; font-weight: 700; }
+.exchange-table-builder > select { width: 100%; max-width: 420px; min-height: 44px; padding: 10px; font: inherit; }
+.exchange-table-picker { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; margin: 18px 0 28px; }
+.exchange-table-picker fieldset { min-width: 0; padding: 12px; border: 1px solid #ddd3c1; border-radius: 10px; }
+.exchange-table-picker legend { padding: 0 4px; font-weight: 700; }
+.exchange-table-picker label { display: inline-flex; align-items: center; gap: 5px; margin: 7px 12px 0 0; }
+.exchange-table-picker input { width: 18px; height: 18px; }
 .v2-share-body > .exchange-table { grid-column: 1 / -1; }
 .v2-progress-head h1 { font-size: clamp(20px, 2.3vw, 28px); line-height: 1.5; }
-@media(max-width: 480px) { .seo-actions { align-items: stretch; flex-direction: column; } .exchange-table { padding: 14px; } .card-seo-summary { grid-template-columns: 1fr 1fr; } .card-seo-symbol { grid-column: 1 / -1; } }
+@media(max-width: 480px) { .seo-actions { align-items: stretch; flex-direction: column; } .exchange-table { padding: 14px; } .exchange-table-picker { grid-template-columns: 1fr; } .card-seo-summary { grid-template-columns: 1fr 1fr; } .card-seo-symbol { grid-column: 1 / -1; } }
 
 .quality-intro{margin:20px 0;padding:16px 20px;border:1px solid #dce2e8;border-radius:12px;background:#fff;font-size:16px;line-height:1.8}.quality-intro nav{display:flex;flex-wrap:wrap;gap:18px}.matching-explainer{padding:20px;border:1px solid #c9a66b;border-radius:12px;background:#faf7f0}.matching-explainer label{display:block;margin:14px 0 6px}.matching-explainer select{width:100%;padding:12px;font:inherit;white-space:normal}.quality-faq dt{font-weight:700;margin-top:24px}.quality-faq dd{margin:8px 0 24px;line-height:1.9}.contact-form{gap:12px}.contact-form textarea,.contact-form select{width:100%;font-size:16px;padding:12px}.contact-consent{display:flex;align-items:flex-start;gap:10px;line-height:1.7;font-size:14px}.contact-consent input{width:18px!important;flex-shrink:0;margin-top:4px}.contact-form button{min-height:44px}.v2-match-score strong{font-size:22px}

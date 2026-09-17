@@ -4,16 +4,16 @@ import { ArticleShell } from '@/components/public-shell';
 import { arcanaCards, cardSlugById } from '@/lib/arcana-cards';
 import { cardNames, languageAlternates, romans } from '@/lib/site-i18n';
 export const metadata: Metadata = {
-  title: '22種類のコレクションカード一覧 | ARCANA LINK',
+  title: '原神 月諭アルカナ全22種類一覧｜交換ページ付き | ARCANA LINK',
   description:
-    '22種類のコレクションカードを番号順に確認できる交換用の一覧です。',
+    '原神「月諭のアルカナ」全22種類を一覧で確認。各アルカナの交換募集ページから、探している人・出せる人を確認できます。',
   alternates: { canonical: '/arcana', languages: languageAlternates('arcana') },
 };
 export default function Arcana() {
   return (
     <ArticleShell
       kicker="COLLECTION"
-      title="22種類のコレクションカード一覧"
+      title="原神 月諭アルカナ全22種類一覧"
       lead="交換募集で使う名称を、アルカナ番号順に確認できます。似た名称の入力間違い防止にお使いください。"
       path="arcana"
     >
