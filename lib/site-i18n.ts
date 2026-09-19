@@ -105,10 +105,15 @@ const chineseCards: Record<ArcanaId, string> = {
 };
 
 export const cardNames: Record<SiteLocale, Record<ArcanaId, string>> = {
-  ja: Object.fromEntries(arcanaIds.map((card) => [card, card])) as Record<
-    ArcanaId,
-    string
-  >,
+  // Keep the legacy Japanese card ID `教皇` for saved inventories and shared
+  // URLs. Only the game-facing label uses the official card name `聖職者`.
+  ja: {
+    ...(Object.fromEntries(arcanaIds.map((card) => [card, card])) as Record<
+      ArcanaId,
+      string
+    >),
+    教皇: '聖職者',
+  },
   en: englishCards,
   'zh-cn': chineseCards,
 };

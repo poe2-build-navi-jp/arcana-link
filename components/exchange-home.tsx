@@ -29,6 +29,7 @@ import {
   type InventoryCounts,
 } from '@/lib/arcana-profile';
 import { evaluateMatch, filterCompatibleServer } from '@/lib/matching';
+import { countNewExactMatches, getListingTiming } from '@/lib/revisit';
 import type { ExchangeSummary } from '@/lib/arcana-db';
 import {
   cardNames,
@@ -302,6 +303,7 @@ export function ExchangeHome({
   const matchTracked = useRef('');
   const revisitTracked = useRef(false);
   const knownMatches = useRef<Set<string> | null>(null);
+  const refreshRequested = useRef(false);
 
   const reviewedSet = useMemo(() => new Set(reviewedCards), [reviewedCards]);
   const reviewedCount = reviewedCards.length;
@@ -354,9 +356,10 @@ export function ExchangeHome({
 
   const exactCount = matches.filter((match) => match.exact).length;
   const partialCount = matches.length - exactCount;
-  const newMatchCount = useMemo(()=>previousVisit ? matches.filter(match=>match.exact && Date.parse(match.profile.updatedAt)>Date.parse(previousVisit)).length : 0,[matches,previousVisit]);
-  const listingAge = lastPublishedAt && currentTime ? currentTime-Date.parse(lastPublishedAt) : 0;
-  const expiresSoon = Boolean(profile.publicId && profile.status !== 'closed' && listingAge >= 6*86400000 && listingAge < 7*86400000);
+  const newMatchCount = useMemo(()=>countNewExactMatches(matches.map(match=>({exact:match.exact,updatedAt:match.profile.updatedAt})),previousVisit),[matches,previousVisit]);
+  const listingTiming = profile.publicId && profile.status !== 'closed' && lastPublishedAt && currentTime ? getListingTiming(lastPublishedAt,currentTime) : 'active';
+  const expiresSoon = listingTiming === 'expires-soon';
+  const listingExpired = listingTiming === 'expired';
 
   /* oxlint-disable react/react-compiler -- Saved browser state is intentionally hydrated after mount. */
   useEffect(() => {
@@ -514,7 +517,8 @@ export function ExchangeHome({
         if (data.mode === 'shared') {
           setShareMode('shared');
           setSaving(false);
-          setToast(copy.saved);
+          setToast(refreshRequested.current ? locale === 'ja' ? '募集を更新しました ✓ あと7日間、マッチ候補に表示されます。' : locale === 'en' ? 'Listing refreshed ✓ It will remain active for 7 days.' : '招募已更新 ✓ 接下来7天会显示在匹配候选中。' : copy.saved);
+          refreshRequested.current = false;
           if (data.updatedAt) {
             setLastPublishedAt(data.updatedAt);
             setCurrentTime(Date.now());
@@ -527,6 +531,7 @@ export function ExchangeHome({
           setProfile((current) => ({ ...current, publicId: data.publicId }));
         }
       } catch {
+        refreshRequested.current = false;
         setSaving(false);
         setShareMode('local');
         setToast(locale === 'ja' ? '公開保存に失敗しました。通信状態を確認してプロフィールを保存し直してください。' : 'Could not publish. Please retry saving your profile.');
@@ -581,6 +586,7 @@ export function ExchangeHome({
 
   function refreshListing() {
     if (!reviewComplete || !profile.publicId) return;
+    refreshRequested.current = true;
     setSaving(true);
     setToast(locale === 'ja' ? '募集を更新しています…' : 'Refreshing listing…');
     track('listing_refresh', {server:profile.server});
@@ -656,6 +662,12 @@ export function ExchangeHome({
       return;
     }
     setProfileOpen(true);
+  }
+
+  function openExchangeTable() {
+    if (!profile.server) { setServerOpen(true); return; }
+    track('exchange_table_create', {server:profile.server});
+    setShareOpen(true);
   }
 
   function openServerSettings() {
@@ -906,6 +918,11 @@ export function ExchangeHome({
     setToast(shareCopy.copiedDone);
   }
 
+  const zeroMatchActions = !listingError ? <div className="v2-empty v2-zero-match">
+    <Bell size={24}/><p>{locale==='ja'?'今は完全に条件が一致する相手がいません。募集を公開しておくと、後から条件一致した相手を確認できます。':locale==='en'?'There is no exact match right now. Publish your listing so you can check compatible players later.':'目前没有条件完全一致的伙伴。发布招募后，可以稍后查看新的匹配。'}</p>
+    <div className="v2-empty-actions"><button className="v2-primary" onClick={openProfileSettings} type="button">{locale==='ja'?'交換募集を公開する':locale==='en'?'Publish exchange listing':'发布交换招募'}</button><button className="v2-x-button" onClick={()=>void postToX()} type="button">𝕏 {locale==='ja'?'で募集する':locale==='en'?'Share on X':'发布招募'}</button><button onClick={openExchangeTable} type="button">{locale==='ja'?'交換表を作る':locale==='en'?'Create exchange table':'制作交换表'}</button><button onClick={()=>setNotifications(true)} type="button"><Bell size={16}/>{serverCopy.alerts}</button></div>
+  </div> : null;
+
   return (
     <main className="v2-page" lang={localeInfo[locale].htmlLang}>
       <header className="topbar v2-topbar">
@@ -1078,7 +1095,7 @@ export function ExchangeHome({
               ),
             )}
           </div>
-          {expiresSoon && <div className="v2-expiry-warning"><p>{locale==='ja'?'あなたの募集はあと1日以内で期限切れです。':'Your listing expires within one day.'}</p><button onClick={refreshListing} type="button">{locale==='ja'?'募集を更新':'Refresh listing'}</button></div>}
+          {listingExpired ? <div className="v2-expiry-warning is-expired"><p>{locale==='ja'?'この募集は期限切れです。再公開すると、あと7日間マッチ候補に表示されます。':locale==='en'?'This listing has expired. Republish it to appear in matching for another 7 days.':'此招募已过期。重新发布后会在匹配候选中显示7天。'}</p><button disabled={saving} onClick={refreshListing} type="button">{locale==='ja'?'募集を再公開する':locale==='en'?'Republish listing':'重新发布招募'}</button></div> : expiresSoon && <div className="v2-expiry-warning"><p>{locale==='ja'?'募集期限が近づいています。あと1日以内でマッチ候補から外れます。':locale==='en'?'Your listing expires within one day and will leave matching results.':'招募将在1天内到期并从匹配候选中移除。'}</p><button disabled={saving} onClick={refreshListing} type="button">{locale==='ja'?'募集を更新する':locale==='en'?'Refresh listing':'更新招募'}</button></div>}
           <button
             className={`v2-alert-toggle ${notifications ? 'active' : ''}`}
             type="button"
@@ -1146,7 +1163,7 @@ export function ExchangeHome({
             );
           })}
         </div>
-        {reviewComplete && <div className="v2-ready-panel"><div><span className="v2-kicker">READY</span><h3>{locale==='ja'?'交換準備完了':locale==='en'?'Ready to trade':'交换准备完成'}</h3><p><b>{locale==='ja'?'求':'Wanted'}：</b>{missing.map(card=>labels[card]).join(' / ')||'—'}</p><p><b>{locale==='ja'?'譲':'Offered'}：</b>{duplicates.map(card=>labels[card]).join(' / ')||'—'}</p></div><nav><a className="v2-primary" href="#matches">{locale==='ja'?'条件が合う相手を探す':'Find compatible players'}</a><button className="v2-x-button" onClick={()=>void postToX()} type="button">𝕏 {locale==='ja'?'で交換募集する':'Share on X'}</button><button onClick={()=>{track('exchange_table_create',{server:profile.server});setShareOpen(true);}} type="button">{locale==='ja'?'交換表を保存する':'Save exchange table'}</button></nav></div>}
+        {reviewComplete && <div className="v2-ready-panel"><div><span className="v2-kicker">READY</span><h3>{locale==='ja'?'交換準備ができました ✓':locale==='en'?'Ready to trade ✓':'交换准备完成 ✓'}</h3><p><b>{locale==='ja'?'求':'Wanted'}：</b>{missing.map(card=>labels[card]).join(' / ')||'—'}</p><p><b>{locale==='ja'?'譲':'Offered'}：</b>{duplicates.map(card=>labels[card]).join(' / ')||'—'}</p><p><b>Server：</b>{activeServerLabel}</p></div><nav><a className="v2-primary" href="#matches">{locale==='ja'?'条件が合う相手を探す':'Find compatible players'}</a><button onClick={openProfileSettings} type="button">{locale==='ja'?'交換募集を公開する':locale==='en'?'Publish exchange listing':'发布交换招募'}</button><button className="v2-x-button" onClick={()=>void postToX()} type="button">𝕏 {locale==='ja'?'で交換募集する':'Share on X'}</button><button onClick={openExchangeTable} type="button">{locale==='ja'?'交換表を保存する':'Save exchange table'}</button></nav></div>}
       </section>
 
       <section className="v2-match-section" id="matches">
@@ -1197,7 +1214,7 @@ export function ExchangeHome({
             </button>
           </div>
         ) : matches.length ? (
-          <div className="v2-match-list">
+          <><div className="v2-match-list">
             {matches.map((match) => (
               <article
                 className={`v2-match-card ${match.exact ? 'exact' : ''}`}
@@ -1243,29 +1260,9 @@ export function ExchangeHome({
                 </button>
               </article>
             ))}
-          </div>
+          </div>{exactCount===0 && zeroMatchActions}</>
         ) : (
-          <div className="v2-empty">
-            {listingError && <p role="alert">{locale==='ja'?'募集を取得できませんでした。実際の募集状況は確認できていません。しばらくしてからページを再読み込みしてください。':'Listings are unavailable. Please reload later.'}</p>}
-            <Bell size={24} />
-            <p>
-              {replaceServerTokens(serverCopy.zero, {
-                server: activeServerLabel,
-              })}
-            </p>
-            <div className="v2-empty-actions">
-              <button
-                className="v2-primary"
-                onClick={openProfileSettings}
-                type="button"
-              >
-                {serverCopy.publish}
-              </button>
-              <button onClick={() => setNotifications(true)} type="button">
-                <Bell size={16} /> {serverCopy.alerts}
-              </button>
-            </div>
-          </div>
+          listingError ? <div className="v2-empty"><p role="alert">{locale==='ja'?'募集を取得できませんでした。実際の募集状況は確認できていません。しばらくしてからページを再読み込みしてください。':'Listings are unavailable. Please reload later.'}</p></div> : zeroMatchActions
         )}
       </section>
 
