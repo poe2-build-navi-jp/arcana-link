@@ -46,6 +46,7 @@ export default function Arcana() {
       <aside className="related">
         <h2>すぐに探す</h2>
         <a href="/">手持ちから交換相手をマッチング →</a>
+        <a href="/genshin-arcana/lunar-mode">幻想シアター月諭モードの入手条件 →</a>
       </aside>
     </ArticleShell>
   );

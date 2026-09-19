@@ -4,6 +4,7 @@ import { arcanaCards } from '@/lib/arcana-cards';
 import { localizedPath, siteLocales } from '@/lib/site-i18n';
 
 const base = 'https://arcana-card-link.pages.dev';
+const updated = new Date('2026-09-19');
 
 const paths = [
   '',
@@ -21,7 +22,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const mainPages = siteLocales.flatMap((locale) =>
     paths.map((path) => ({
       url: `${base}${localizedPath(locale, path)}`,
-      lastModified: new Date('2026-09-17'),
+      lastModified: locale === 'ja' && (path === 'genshin-arcana' || path === 'guide' || path === 'arcana')
+        ? updated
+        : new Date('2026-09-17'),
       changeFrequency: path === '' ? ('weekly' as const) : ('monthly' as const),
       priority: path === '' ? 1 : path === 'genshin-arcana' ? 0.9 : 0.7,
     })),
@@ -34,5 +37,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.75,
     })),
   );
-  return [...mainPages, ...cardPages, {url:base+'/contact',lastModified:new Date('2026-09-17'),changeFrequency:'monthly',priority:0.3}, {url:base+'/genshin-arcana/exchange-table',lastModified:new Date('2026-09-17'),changeFrequency:'monthly',priority:0.8}];
+  return [
+    ...mainPages,
+    ...cardPages,
+    {url:base+'/contact',lastModified:new Date('2026-09-17'),changeFrequency:'monthly',priority:0.3},
+    {url:base+'/genshin-arcana/exchange-table',lastModified:new Date('2026-09-17'),changeFrequency:'monthly',priority:0.8},
+    {url:base+'/genshin-arcana/lunar-mode',lastModified:updated,changeFrequency:'monthly',priority:0.85},
+  ];
 }

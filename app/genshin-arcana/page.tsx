@@ -89,6 +89,9 @@ export default async function GenshinArcana() {
             実際の交換はウェブサイト上ではなく、フレンドと同じ世界に入ったマルチプレイ中に行います。ARCANA
             LINKの役割は、その前段階となる「お互いの条件が合う相手を見つけること」です。
           </p>
+          <p>
+            入手条件を先に確認したい場合は、<a href="/genshin-arcana/lunar-mode">幻想シアター月諭モードの攻略とアルカナ入手手順</a>を確認してください。
+          </p>
         </section>
         <section id="before">
           <h2>交換相手を探す前に確認すること</h2>
