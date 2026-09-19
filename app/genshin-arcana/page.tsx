@@ -1,7 +1,11 @@
 /* oxlint-disable next/no-html-link-for-pages -- Native navigation avoids a vinext client-link runtime failure. */
 import type { Metadata } from 'next';
+import { ExchangeInsights } from '@/components/exchange-insights';
 import { ArticleShell } from '@/components/public-shell';
+import { readExchangeSummary } from '@/lib/arcana-db';
 import { languageAlternates } from '@/lib/site-i18n';
+
+export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: '原神 月諭アルカナ交換のやり方｜募集・相手の探し方 | ARCANA LINK',
@@ -40,7 +44,8 @@ const faq = [
   },
 ];
 
-export default function GenshinArcana() {
+export default async function GenshinArcana() {
+  const summary = await readExchangeSummary();
   const structuredData = {
     '@context': 'https://schema.org',
     '@type': 'Article',
@@ -48,7 +53,7 @@ export default function GenshinArcana() {
     description:
       '原神の月諭アルカナ交換をする前に必要な準備と、条件の合う相手の探し方を解説します。',
     datePublished: '2026-09-05',
-    dateModified: '2026-09-17',
+    dateModified: '2026-09-19',
     author: { '@type': 'Organization', name: 'ARCANA LINK運営' },
     publisher: { '@type': 'Organization', name: 'ARCANA LINK' },
     mainEntityOfPage: 'https://arcana-card-link.pages.dev/genshin-arcana',
@@ -70,9 +75,11 @@ export default function GenshinArcana() {
           <a href="#what">原神の月諭アルカナとは</a>
           <a href="#before">交換相手を探す前に確認すること</a>
           <a href="#find">アルカナ交換の募集を探す方法</a>
+          <a href="#exchange-status">現在の交換状況</a>
           <a href="#steps">交換完了までの手順</a>
           <a href="#cant-find-partner">相手が見つからないとき</a><a href="#uid">UIDとサーバー</a><a href="#complete-guide">22種類の整理</a><a href="#faq">よくある質問</a>
         </nav>
+        {summary && <ExchangeInsights locale="ja" summary={summary} />}
         <section id="what">
           <h2>原神の月諭アルカナとは</h2>
           <p>
@@ -168,7 +175,7 @@ export default function GenshinArcana() {
             LINK運営が独自に整理したものです。第三者の画像、ロゴ、音楽、物語文、キャラクター素材は掲載していません。当サイトは非公式であり、対象ゲームの開発・運営会社とは関係ありません。
           </p>
         </section>
-        <p className="updated">公開日：2026年9月5日 / 最終更新：2026年9月17日</p>
+        <p className="updated">公開日：2026年9月5日 / 最終更新：2026年9月19日</p>
       </ArticleShell>
     </>
   );

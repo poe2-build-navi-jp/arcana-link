@@ -4,12 +4,12 @@ import {
   type ExchangeProfile,
   type InventoryCounts,
 } from '@/lib/arcana-profile';
-import { type SiteLocale } from '@/lib/site-i18n';
-import type { ArcanaId } from '@/lib/site-i18n';
+import { arcanaIds, type ArcanaId, type SiteLocale } from '@/lib/site-i18n';
 import { type ExchangeStatus } from '@/lib/v2-i18n';
 import {
   normalizeServerRegion,
   serverDatabaseValues,
+  serverRegions,
   type ServerRegion,
 } from '@/lib/server-region';
 
@@ -29,20 +29,92 @@ function database() {
   return (env as unknown as { DB?: D1Database }).DB;
 }
 
-export async function readExchangeSummary() {
+export type ExchangePairInsight = {
+  server: ServerRegion;
+  want: ArcanaId;
+  offer: ArcanaId;
+  matches: number;
+};
+
+export type ExchangeSummary = {
+  open: number;
+  recent: number;
+  servers: Record<ServerRegion, number>;
+  updatedAt: string | null;
+  generatedAt: string;
+  popularPairs: ExchangePairInsight[];
+};
+
+export async function readExchangeSummary(): Promise<ExchangeSummary | null> {
   const db = database();
   if (!db) return null;
   const cutoff = new Date(Date.now() - 7 * 86400000).toISOString();
   const recent = new Date(Date.now() - 86400000).toISOString();
   try {
-    return await db.prepare(`SELECT
-      SUM(CASE WHEN status = 'open' THEN 1 ELSE 0 END) AS open_count,
-      SUM(CASE WHEN status = 'open' AND updated_at >= ? THEN 1 ELSE 0 END) AS recent_count,
-      SUM(CASE WHEN status = 'open' AND lower(server) = 'asia' THEN 1 ELSE 0 END) AS asia_count,
-      MAX(CASE WHEN status = 'open' THEN updated_at END) AS updated
-      FROM exchange_profiles WHERE updated_at >= ?`)
+    const summary = await db.prepare(`SELECT server,
+      COUNT(*) AS open_count,
+      SUM(CASE WHEN updated_at >= ? THEN 1 ELSE 0 END) AS recent_count,
+      MAX(updated_at) AS updated
+      FROM exchange_profiles
+      WHERE status = 'open' AND updated_at >= ?
+      GROUP BY server`)
       .bind(recent, cutoff)
-      .first<{open_count:number;recent_count:number;asia_count:number;updated:string|null}>();
+      .all<{server:string;open_count:number;recent_count:number;updated:string}>();
+    const pairRows = await db.prepare(`SELECT server, inventory_json
+      FROM exchange_profiles
+      WHERE status = 'open' AND updated_at >= ? AND json_valid(inventory_json)
+      ORDER BY updated_at DESC`)
+      .bind(cutoff)
+      .all<{server:string;inventory_json:string}>();
+
+    const servers = Object.fromEntries(serverRegions.map(server => [server, 0])) as Record<ServerRegion, number>;
+    let open = 0;
+    let recentCount = 0;
+    let updatedAt: string | null = null;
+    for (const row of summary.results) {
+      const server = normalizeServerRegion(row.server);
+      if (!server) continue;
+      servers[server] += row.open_count;
+      open += row.open_count;
+      recentCount += row.recent_count;
+      if (!updatedAt || row.updated > updatedAt) updatedAt = row.updated;
+    }
+
+    const conditions = new Map<string, number>();
+    for (const row of pairRows.results) {
+      const server = normalizeServerRegion(row.server);
+      const inventory = normalizeInventory(JSON.parse(row.inventory_json));
+      if (!server || !inventory) continue;
+      const wants = arcanaIds.filter(card => inventory[card] === 0);
+      const offers = arcanaIds.filter(card => inventory[card] >= 2);
+      for (const want of wants) for (const offer of offers) {
+        const key = `${server}|${want}|${offer}`;
+        conditions.set(key, (conditions.get(key) ?? 0) + 1);
+      }
+    }
+    const popularPairs: ExchangePairInsight[] = [];
+    for (const server of serverRegions) {
+      for (let left = 0; left < arcanaIds.length; left += 1) {
+        for (let right = left + 1; right < arcanaIds.length; right += 1) {
+          const want = arcanaIds[left];
+          const offer = arcanaIds[right];
+          const matches = Math.min(
+            conditions.get(`${server}|${want}|${offer}`) ?? 0,
+            conditions.get(`${server}|${offer}|${want}`) ?? 0,
+          );
+          if (matches > 0) popularPairs.push({ server, want, offer, matches });
+        }
+      }
+    }
+    popularPairs.sort((a, b) => b.matches - a.matches);
+    return {
+      open,
+      recent: recentCount,
+      servers,
+      updatedAt,
+      generatedAt: new Date().toISOString(),
+      popularPairs: popularPairs.slice(0, 5),
+    };
   } catch { return null; }
 }
 

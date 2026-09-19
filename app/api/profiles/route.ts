@@ -11,12 +11,9 @@ export async function GET(request: NextRequest) {
   if (request.nextUrl.searchParams.get('summary') === '1') {
     const summary = await readExchangeSummary();
     if (!summary) return NextResponse.json({ error: 'unavailable' }, { status: 503 });
-    return NextResponse.json({
-      open: summary.open_count || 0,
-      recent: summary.recent_count || 0,
-      asia: summary.asia_count || 0,
-      updatedAt: summary.updated,
-    }, { headers: { 'Cache-Control': 'public, max-age=60' } });
+    return NextResponse.json(summary, {
+      headers: { 'Cache-Control': 'public, max-age=60' },
+    });
   }
   const server = normalizeServerRegion(
     request.nextUrl.searchParams.get('server'),

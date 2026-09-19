@@ -15,6 +15,7 @@ import {
   X,
 } from '@/components/icons';
 import { ExchangeTable } from '@/components/exchange-table';
+import { ExchangeInsights } from '@/components/exchange-insights';
 import { track } from '@/lib/analytics';
 import { arcanaCards, cardBySlug, cardSlugById } from '@/lib/arcana-cards';
 import {
@@ -28,6 +29,7 @@ import {
   type InventoryCounts,
 } from '@/lib/arcana-profile';
 import { evaluateMatch, filterCompatibleServer } from '@/lib/matching';
+import type { ExchangeSummary } from '@/lib/arcana-db';
 import {
   cardNames,
   homeCopy,
@@ -61,13 +63,6 @@ type Match = {
   receive: ArcanaId[];
   exact: boolean;
   score: number;
-};
-
-type ExchangeSummary = {
-  open: number;
-  recent: number;
-  asia: number;
-  updatedAt: string | null;
 };
 
 const storageKeys = {
@@ -252,15 +247,13 @@ function replaceServerTokens(value: string, values: Record<string, string>) {
   );
 }
 
-function relativeUpdate(locale: SiteLocale, value: string | null, now: number) {
-  if (!value) return '—';
-  const minutes = Math.max(0, Math.floor((now-Date.parse(value))/60000));
-  if (locale === 'ja') return minutes < 1 ? '1分以内' : minutes < 60 ? `${minutes}分前` : minutes < 1440 ? `${Math.floor(minutes/60)}時間前` : `${Math.floor(minutes/1440)}日前`;
-  if (locale === 'zh-cn') return minutes < 60 ? `${Math.max(1,minutes)}分钟前` : `${Math.floor(minutes/60)}小时前`;
-  return minutes < 60 ? `${Math.max(1,minutes)} min ago` : `${Math.floor(minutes/60)} hr ago`;
-}
-
-export function ExchangeHome({ locale }: { locale: SiteLocale }) {
+export function ExchangeHome({
+  locale,
+  initialSummary = null,
+}: {
+  locale: SiteLocale;
+  initialSummary?: ExchangeSummary | null;
+}) {
   const copy = v2Copy[locale];
   const siteCopy = homeCopy[locale];
   const labels = cardNames[locale];
@@ -295,7 +288,7 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
   const [listingError, setListingError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [shareMode, setShareMode] = useState<'local' | 'shared'>('local');
-  const [summary, setSummary] = useState<ExchangeSummary | null>(null);
+  const [summary, setSummary] = useState<ExchangeSummary | null>(initialSummary);
   const [reviewedCards, setReviewedCards] = useState<ArcanaId[]>([]);
   const [previousVisit, setPreviousVisit] = useState('');
   const [revisitDismissed, setRevisitDismissed] = useState(false);
@@ -1002,7 +995,7 @@ export function ExchangeHome({ locale }: { locale: SiteLocale }) {
         <ul><li>{locale==='ja'?'お互いの「求・譲」を自動比較':locale==='en'?'Compare both wanted and offered cards':'自动比较双方求与出'}</li><li>{locale==='ja'?'同じサーバーだけ表示':locale==='en'?'Show players on your server only':'仅显示同服务器玩家'}</li><li>{locale==='ja'?'条件一致した相手を優先表示':locale==='en'?'Prioritize two-way matches':'优先显示双向匹配'}</li><li>{locale==='ja'?'7日以上更新のない募集は除外':locale==='en'?'Exclude listings inactive for 7 days':'排除7天未更新招募'}</li></ul>
         <nav><a className="card-seo-action" href="#inventory" onClick={()=>{startRegistration();if(!profile.server)setServerOpen(true);}}>{locale==='ja'?'カードを登録して相手を探す':locale==='en'?'Add cards and find a match':'登记圣牌并寻找伙伴'}</a><a href={localizedPath(locale,'guide')}>{locale==='ja'?'使い方を見る':'How it works'}</a></nav>
       </section>
-      {summary && <section className="v2-service-status" aria-label={locale==='ja'?'現在の交換状況':'Current exchange activity'}><h2>{locale==='ja'?'現在の交換状況':locale==='en'?'Current exchange activity':'当前交换状态'}</h2>{summary.open>=10?<div><span><b>{summary.open}</b>{locale==='ja'?'受付中':' open'}</span><span><b>{summary.recent}</b>{locale==='ja'?'今日更新':' updated today'}</span><span><b>{summary.asia}</b>Asia</span><span><b>{relativeUpdate(locale,summary.updatedAt,currentTime)}</b>{locale==='ja'?'最終更新':' last update'}</span></div>:<p>{summary.recent>0?(locale==='ja'?'最近更新された募集があります':locale==='en'?'Listings were updated recently':'最近有更新的招募'):(locale==='ja'?'募集データを自動更新しています':locale==='en'?'Listing data updates automatically':'招募数据自动更新')} · {locale==='ja'?'最終更新':'Updated'} {relativeUpdate(locale,summary.updatedAt,currentTime)}</p>}</section>}
+      {summary && <ExchangeInsights locale={locale} now={currentTime} summary={summary} />}
       <section className="v2-overview" aria-labelledby="collection-heading">
         <div className="v2-progress-card">
           <div className="v2-progress-head">

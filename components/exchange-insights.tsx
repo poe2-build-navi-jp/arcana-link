@@ -1,0 +1,146 @@
+import type { ExchangeSummary } from '@/lib/arcana-db';
+import { cardNames, type SiteLocale } from '@/lib/site-i18n';
+import { serverLabels, serverRegions } from '@/lib/server-region';
+
+function relativeUpdate(locale: SiteLocale, value: string | null, now: number) {
+  if (!value) return '—';
+  const minutes = Math.max(0, Math.floor((now - Date.parse(value)) / 60000));
+  if (locale === 'ja')
+    return minutes < 1
+      ? '1分以内'
+      : minutes < 60
+        ? `${minutes}分前`
+        : minutes < 1440
+          ? `${Math.floor(minutes / 60)}時間前`
+          : `${Math.floor(minutes / 1440)}日前`;
+  if (locale === 'zh-cn')
+    return minutes < 60
+      ? `${Math.max(1, minutes)}分钟前`
+      : `${Math.floor(minutes / 60)}小时前`;
+  return minutes < 60
+    ? `${Math.max(1, minutes)} min ago`
+    : `${Math.floor(minutes / 60)} hr ago`;
+}
+
+export function ExchangeInsights({
+  locale,
+  summary,
+  now,
+}: {
+  locale: SiteLocale;
+  summary: ExchangeSummary;
+  now?: number;
+}) {
+  const labels = cardNames[locale];
+  const referenceTime = now || Date.parse(summary.generatedAt);
+  return (
+    <section
+      className="v2-service-status"
+      id="exchange-status"
+      aria-label={locale === 'ja' ? '現在の交換状況' : 'Current exchange activity'}
+    >
+      <h2>
+        {locale === 'ja'
+          ? '現在の交換状況'
+          : locale === 'en'
+            ? 'Current exchange activity'
+            : '当前交换状态'}
+      </h2>
+      <div className={`v2-service-totals${summary.open < 10 ? ' is-low-volume' : ''}`}>
+        <span>
+          <b>{summary.open}</b>
+          {locale === 'ja'
+            ? '受付中の募集'
+            : locale === 'zh-cn'
+              ? '招募中'
+              : ' open listings'}
+        </span>
+        <span>
+          <b>{summary.recent}</b>
+          {locale === 'ja'
+            ? '今日更新'
+            : locale === 'zh-cn'
+              ? '今日更新'
+              : ' updated today'}
+        </span>
+        <span>
+          <b>{relativeUpdate(locale, summary.updatedAt, referenceTime)}</b>
+          {locale === 'ja'
+            ? '最終更新'
+            : locale === 'zh-cn'
+              ? '最后更新'
+              : ' last update'}
+        </span>
+      </div>
+      {summary.open > 0 ? (
+        <div className="v2-server-activity">
+          <h3>
+            {locale === 'ja'
+              ? 'サーバー別の受付中募集'
+              : locale === 'zh-cn'
+                ? '各服务器招募数'
+                : 'Open listings by server'}
+          </h3>
+          <ul>
+            {serverRegions.map((server) => (
+              <li key={server}>
+                <span>{serverLabels.en[server]}</span>
+                <b>{summary.servers[server]}</b>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <p>
+          {locale === 'ja'
+            ? '現在、受付中の公開募集はありません。'
+            : locale === 'zh-cn'
+              ? '目前没有公开招募。'
+              : 'There are no open public listings.'}
+        </p>
+      )}
+      {summary.popularPairs.length > 0 && (
+        <div className="v2-popular-pairs">
+          <h3>
+            {locale === 'ja'
+              ? '最近マッチしやすい組み合わせ'
+              : locale === 'zh-cn'
+                ? '最近易匹配的组合'
+                : 'Recently matchable combinations'}
+          </h3>
+          <p>
+            {locale === 'ja'
+              ? '過去7日以内の受付中データから、同じサーバーで求・譲が相互に一致する候補を集計しています。'
+              : locale === 'zh-cn'
+                ? '根据过7天内同服务器的求与出条件计算。'
+                : 'Calculated from reciprocal wanted and offered conditions in active listings from the last 7 days.'}
+          </p>
+          <ul>
+            {summary.popularPairs.map((pair) => (
+              <li key={`${pair.server}-${pair.want}-${pair.offer}`}>
+                <span>{serverLabels.en[pair.server]}</span>
+                <b>
+                  {labels[pair.want]} ↔ {labels[pair.offer]}
+                </b>
+                <small>
+                  {locale === 'ja'
+                    ? `${pair.matches}組の相互条件候補`
+                    : locale === 'zh-cn'
+                      ? `${pair.matches}组双向条件候选`
+                      : `${pair.matches} reciprocal candidate${pair.matches > 1 ? 's' : ''}`}
+                </small>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <small className="v2-data-scope">
+        {locale === 'ja'
+          ? 'ARCANA LINK登録データ・過去7日以内に更新された受付中募集のみ集計'
+          : locale === 'zh-cn'
+            ? 'ARCANA LINK登记数据：仅统计过7天内更新的公开招募。'
+            : 'ARCANA LINK data: open listings updated within the last 7 days.'}
+      </small>
+    </section>
+  );
+}
