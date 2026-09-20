@@ -29,7 +29,7 @@ import {
   type InventoryCounts,
 } from '@/lib/arcana-profile';
 import { evaluateMatch, filterCompatibleServer } from '@/lib/matching';
-import { countNewExactMatches, getListingTiming } from '@/lib/revisit';
+import { getListingDaysRemaining, getListingTiming } from '@/lib/revisit';
 import type { ExchangeSummary } from '@/lib/arcana-db';
 import {
   cardNames,
@@ -74,6 +74,7 @@ const storageKeys = {
   server: 'arcana_server',
   reviewed: 'arcana-link-v2-reviewed',
   lastVisit: 'arcana-link-v2-last-visit',
+  lastSeenMatchIds: 'arcana-link-v2-last-seen-match-ids',
   publishedAt: 'arcana-link-v2-published-at',
 };
 
@@ -287,23 +288,31 @@ export function ExchangeHome({
   const [token, setToken] = useState('');
   const [hydrated, setHydrated] = useState(false);
   const [listingError, setListingError] = useState(false);
+  const [listingsLoaded, setListingsLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [shareMode, setShareMode] = useState<'local' | 'shared'>('local');
+  const [, setShareMode] = useState<'local' | 'shared'>('local');
   const [summary, setSummary] = useState<ExchangeSummary | null>(initialSummary);
   const [reviewedCards, setReviewedCards] = useState<ArcanaId[]>([]);
   const [previousVisit, setPreviousVisit] = useState('');
   const [revisitDismissed, setRevisitDismissed] = useState(false);
+  const [lastSeenMatchIds, setLastSeenMatchIds] = useState<string[]>([]);
   const [lastPublishedAt, setLastPublishedAt] = useState('');
   const [currentTime, setCurrentTime] = useState(0);
   const [profileDirty, setProfileDirty] = useState(false);
   const [refreshVersion, setRefreshVersion] = useState(0);
   const [intent, setIntent] = useState<{slug:string; action:string} | null>(null);
+  const [publishSuccess, setPublishSuccess] = useState(false);
+  const [tradeSuccess, setTradeSuccess] = useState(false);
   const registerTracked = useRef(false);
   const completeTracked = useRef(false);
+  const inputCompleteTracked = useRef(false);
   const matchTracked = useRef('');
   const revisitTracked = useRef(false);
   const knownMatches = useRef<Set<string> | null>(null);
   const refreshRequested = useRef(false);
+  const publishRequested = useRef(false);
+  const sharedListingReferral = useRef(false);
+  const zeroMatchTracked = useRef(false);
 
   const reviewedSet = useMemo(() => new Set(reviewedCards), [reviewedCards]);
   const reviewedCount = reviewedCards.length;
@@ -356,8 +365,21 @@ export function ExchangeHome({
 
   const exactCount = matches.filter((match) => match.exact).length;
   const partialCount = matches.length - exactCount;
-  const newMatchCount = useMemo(()=>countNewExactMatches(matches.map(match=>({exact:match.exact,updatedAt:match.profile.updatedAt})),previousVisit),[matches,previousVisit]);
+  const newMatchIds = useMemo(() => {
+    const previous = Date.parse(previousVisit);
+    if (!Number.isFinite(previous)) return [];
+    return matches
+      .filter(
+        (match) =>
+          match.exact &&
+          Date.parse(match.profile.updatedAt) > previous &&
+          !lastSeenMatchIds.includes(match.profile.publicId),
+      )
+      .map((match) => match.profile.publicId);
+  }, [lastSeenMatchIds, matches, previousVisit]);
+  const newMatchCount = newMatchIds.length;
   const listingTiming = profile.publicId && profile.status !== 'closed' && lastPublishedAt && currentTime ? getListingTiming(lastPublishedAt,currentTime) : 'active';
+  const listingDaysRemaining = profile.publicId && profile.status !== 'closed' && lastPublishedAt && currentTime ? getListingDaysRemaining(lastPublishedAt,currentTime) : 0;
   const expiresSoon = listingTiming === 'expires-soon';
   const listingExpired = listingTiming === 'expired';
 
@@ -372,13 +394,26 @@ export function ExchangeHome({
       localStorage.getItem(storageKeys.profile) || 'null',
     ) as (Omit<LocalProfile, 'server'> & { server?: unknown }) | null;
     const savedReviewed = JSON.parse(localStorage.getItem(storageKeys.reviewed) || '[]') as unknown;
+    let savedReviewComplete = false;
     if (Array.isArray(savedReviewed)) {
       const valid = savedReviewed.filter((card): card is ArcanaId=>typeof card === 'string' && arcanaCards.some(item=>item.id===card));
+      savedReviewComplete = valid.length === arcanaCards.length;
       if (valid.length) setReviewedCards([...new Set(valid)]);
-      else if (savedProfile?.publicId || (savedInventory && collectedTypeCount(savedInventory)>0)) setReviewedCards(arcanaCards.map(card=>card.id));
+      else if (savedProfile?.publicId || (savedInventory && collectedTypeCount(savedInventory)>0)) {
+        savedReviewComplete = true;
+        setReviewedCards(arcanaCards.map(card=>card.id));
+      }
     }
     const lastVisit = localStorage.getItem(storageKeys.lastVisit) || '';
     setPreviousVisit(lastVisit);
+    const savedSeenMatches = JSON.parse(
+      localStorage.getItem(storageKeys.lastSeenMatchIds) || '[]',
+    ) as unknown;
+    if (Array.isArray(savedSeenMatches)) {
+      setLastSeenMatchIds(
+        savedSeenMatches.filter((id): id is string => typeof id === 'string'),
+      );
+    }
     setCurrentTime(Date.now());
     localStorage.setItem(storageKeys.lastVisit, new Date().toISOString());
     setLastPublishedAt(localStorage.getItem(storageKeys.publishedAt) || '');
@@ -390,6 +425,8 @@ export function ExchangeHome({
     );
     if (urlServer) setRequestedServer(urlServer);
     const params = new URL(window.location.href).searchParams;
+    sharedListingReferral.current =
+      params.get('utm_source') === 'shared_listing';
     const wantSlugs = new Set((params.get('want') || '').split(',').filter(slug=>Object.hasOwn(cardBySlug,slug)));
     const offerSlugs = new Set((params.get('offer') || '').split(',').filter(slug=>Object.hasOwn(cardBySlug,slug)));
     if (params.has('want') || params.has('offer')) {
@@ -406,6 +443,9 @@ export function ExchangeHome({
       });
     } else if (savedServer) {
       setProfile((current) => ({ ...current, server: savedServer }));
+    }
+    if (params.get('publish') === '1' && savedReviewComplete) {
+      setProfileOpen(true);
     }
     if (!savedServer) {
       setServerChoice(urlServer ?? '');
@@ -451,9 +491,11 @@ export function ExchangeHome({
     return () => { stopped = true; window.clearInterval(interval); };
   }, []);
 
+  /* oxlint-disable react/react-compiler -- Reset loading state when the selected server changes. */
   useEffect(() => {
     if (!profile.server) return;
     let stopped = false;
+    setListingsLoaded(false);
     const refresh = async () => {
       try {
         const response = await fetch(
@@ -466,6 +508,7 @@ export function ExchangeHome({
         };
         if (!response.ok) throw new Error('listing_unavailable');
         if (stopped) return;
+        setListingsLoaded(true);
         setListingError(data.mode !== 'shared');
         setShareMode(data.mode === 'shared' ? 'shared' : 'local');
         if (data.mode === 'shared') {
@@ -476,6 +519,7 @@ export function ExchangeHome({
         }
       } catch {
         if (!stopped) {
+          setListingsLoaded(true);
           setShareMode('local');
           setProfiles([]);
           setListingError(true);
@@ -489,6 +533,7 @@ export function ExchangeHome({
       window.clearInterval(interval);
     };
   }, [locale, profile.server]);
+  /* oxlint-enable react/react-compiler */
 
   useEffect(() => {
     if (
@@ -526,19 +571,29 @@ export function ExchangeHome({
           }
           setProfileDirty(false);
           if (!completeTracked.current) {track('register_complete', {server:profile.server}); completeTracked.current = true;}
+          if (publishRequested.current) {
+            track('listing_publish_success', { server: profile.server });
+            if (sharedListingReferral.current) {
+              track('shared_listing_new_listing', { server: profile.server });
+            }
+            publishRequested.current = false;
+            setPublishSuccess(true);
+            setShareOpen(true);
+          }
         }
         if (data.publicId && data.publicId !== profile.publicId) {
           setProfile((current) => ({ ...current, publicId: data.publicId }));
         }
       } catch {
         refreshRequested.current = false;
+        publishRequested.current = false;
         setSaving(false);
         setShareMode('local');
         setToast(locale === 'ja' ? '公開保存に失敗しました。通信状態を確認してプロフィールを保存し直してください。' : 'Could not publish. Please retry saving your profile.');
       }
     }, 700);
     return () => window.clearTimeout(timer);
-  }, [hydrated, inventory, locale, profile, profileDirty, refreshVersion, reviewComplete, token]);
+  }, [copy.saved, hydrated, inventory, locale, profile, profileDirty, refreshVersion, reviewComplete, token]);
 
   useEffect(() => {
     const newExact = newMatchCount;
@@ -573,14 +628,42 @@ export function ExchangeHome({
     knownMatches.current = exactIds;
   }, [locale, matches, newMatchCount, notifications]);
 
+  useEffect(() => {
+    if (
+      hydrated &&
+      reviewComplete &&
+      profile.server &&
+      listingsLoaded &&
+      !listingError &&
+      exactCount === 0 &&
+      !zeroMatchTracked.current
+    ) {
+      track('match_zero', { server: profile.server });
+      zeroMatchTracked.current = true;
+    }
+    if (exactCount > 0) zeroMatchTracked.current = false;
+  }, [exactCount, hydrated, listingError, listingsLoaded, profile.server, reviewComplete]);
+
   function startRegistration() {
-    if (!registerTracked.current) {track('register_start'); registerTracked.current = true;}
+    if (!registerTracked.current) {
+      track('register_start');
+      track('input_start');
+      registerTracked.current = true;
+    }
   }
   function setCount(card: ArcanaId, count: CardCount) {
     startRegistration();
     if (!profile.server) { setServerOpen(true); return; }
     setInventory(current=>({...current,[card]:count}));
-    setReviewedCards(current=>current.includes(card)?current:[...current,card]);
+    setReviewedCards(current=>{
+      if (current.includes(card)) return current;
+      const next = [...current,card];
+      if (next.length === arcanaCards.length && !inputCompleteTracked.current) {
+        track('input_complete_22', { server: profile.server });
+        inputCompleteTracked.current = true;
+      }
+      return next;
+    });
     setProfileDirty(true);
   }
 
@@ -600,7 +683,7 @@ export function ExchangeHome({
     setToast(statusLabel(locale, status));
   }
 
-  function submitProfile(event: React.FormEvent<HTMLFormElement>) {
+  function submitProfile(event: React.SyntheticEvent<HTMLFormElement, SubmitEvent>) {
     event.preventDefault();
     if (!reviewComplete) {
       setProfileOpen(false);
@@ -614,11 +697,17 @@ export function ExchangeHome({
       return;
     }
     const form = new FormData(event.currentTarget);
+    const formText = (name: string) => {
+      const value = form.get(name);
+      return typeof value === 'string' ? value : '';
+    };
+    publishRequested.current = true;
+    track('listing_publish', { server: profile.server });
     setProfile((current) => ({
       ...current,
-      displayName: String(form.get('displayName') || '').trim(),
-      uid: String(form.get('uid') || ''),
-      note: String(form.get('note') || '').trim(),
+      displayName: formText('displayName').trim(),
+      uid: formText('uid'),
+      note: formText('note').trim(),
       status: 'open',
     }));
     setProfileDirty(true);
@@ -662,6 +751,28 @@ export function ExchangeHome({
       return;
     }
     setProfileOpen(true);
+  }
+
+  function publishCurrentListing() {
+    if (!profile.server) {
+      setServerOpen(true);
+      return;
+    }
+    if (
+      profile.publicId &&
+      profile.displayName.trim() &&
+      /^\d{9,10}$/.test(profile.uid)
+    ) {
+      publishRequested.current = true;
+      track('listing_publish', { server: profile.server });
+      setSaving(true);
+      setToast(locale === 'ja' ? '公開募集を保存しています…' : 'Saving your listing…');
+      setProfile((current) => ({ ...current, status: 'open' }));
+      setProfileDirty(true);
+      setRefreshVersion((current) => current + 1);
+      return;
+    }
+    openProfileSettings();
   }
 
   function openExchangeTable() {
@@ -725,7 +836,17 @@ export function ExchangeHome({
     setProfile((current) => ({ ...current, status: 'open' }));
     setProfileDirty(true);
     setSelectedMatch(null);
+    setTradeSuccess(true);
+    track('trade_completed', { server: profile.server });
     setToast(copy.completed);
+  }
+
+  function markNewMatchesSeen() {
+    const next = [...new Set([...lastSeenMatchIds, ...newMatchIds])];
+    setLastSeenMatchIds(next);
+    localStorage.setItem(storageKeys.lastSeenMatchIds, JSON.stringify(next));
+    setRevisitDismissed(true);
+    track('new_match_view', { count: newMatchIds.length, server: profile.server });
   }
 
   function summarizedNames(cards: ArcanaId[]) {
@@ -735,9 +856,17 @@ export function ExchangeHome({
       : visible.join('・');
   }
 
-  function shareText() {
-    const params = new URLSearchParams({server:profile.server||'asia',want:missing.map(card=>cardSlugById[card]).join(','),offer:duplicates.map(card=>cardSlugById[card]).join(','),utm_source:'x',utm_medium:'social',utm_campaign:'exchange'});
-    const url = profile.publicId ? `https://arcana-card-link.pages.dev/genshin-arcana/share/${profile.publicId}?utm_source=x&utm_medium=social&utm_campaign=exchange` : `https://arcana-card-link.pages.dev/?${params.toString()}#matches`;
+  function listingShareUrl(source = 'copy') {
+    const medium = source === 'x' ? 'social' : 'referral';
+    if (profile.publicId) {
+      return `https://arcana-card-link.pages.dev/genshin-arcana/share/${profile.publicId}?utm_source=${source}&utm_medium=${medium}&utm_campaign=exchange`;
+    }
+    const params = new URLSearchParams({server:profile.server||'asia',want:missing.map(card=>cardSlugById[card]).join(','),offer:duplicates.map(card=>cardSlugById[card]).join(','),utm_source:source,utm_medium:medium,utm_campaign:'exchange'});
+    return `https://arcana-card-link.pages.dev/?${params.toString()}#matches`;
+  }
+
+  function shareText(source = 'x') {
+    const url = listingShareUrl(source);
     if (locale === 'en') return ['Looking for Genshin Impact Lunar Arcana trades!','【Wanted】 '+(missing.map(c=>labels[c]).join(' / ')||'None'),'【Offered】 '+(duplicates.map(c=>labels[c]).join(' / ')||'None'),'Server: '+activeServerLabel,'Check compatible trades 👇',url,'#GenshinImpact #ArcanaTrade'].join('\n');
     if (locale === 'zh-cn') return ['寻找原神月谕圣牌交换伙伴！','【求】'+(missing.map(c=>labels[c]).join(' / ')||'无'),'【出】'+(duplicates.map(c=>labels[c]).join(' / ')||'无'),'Server：'+activeServerLabel,'查看匹配条件👇',url,'#原神 #月谕圣牌'].join('\n');
     return ['原神の月諭アルカナ交換相手を探しています！','【求】'+(missing.map(c=>labels[c]).join(' / ')||'なし'),'【譲】'+(duplicates.map(c=>labels[c]).join(' / ')||'なし'),'Server：'+activeServerLabel,'条件が合う方はこちら👇',url,'#原神 #原神アルカナ #アルカナ交換'].join('\n');
@@ -871,56 +1000,73 @@ export function ExchangeHome({
 
   async function postToX() {
     track('share_x', {server:profile.server});
-    const text = shareText();
-    const supportsFileShare =
-      typeof navigator.share === 'function' &&
-      typeof navigator.canShare === 'function' &&
-      navigator.canShare({
-        files: [new File([''], 'arcana-link.png', { type: 'image/png' })],
-      });
-    if (!supportsFileShare) {
-      window.open(
-        `https://x.com/intent/post?text=${encodeURIComponent(text)}`,
-        '_blank',
-        'noopener,noreferrer',
-      );
-      setToast(shareCopy.fallback);
-      return;
-    }
+    window.open(
+      `https://x.com/intent/post?text=${encodeURIComponent(shareText('x'))}`,
+      '_blank',
+      'noopener,noreferrer',
+    );
+  }
 
-    setShareBusy(true);
+  async function shareNative() {
+    if (typeof navigator.share !== 'function') return;
     try {
-      const blob = await collectionImage();
-      const file = new File([blob], `arcana-link-${collected}-of-22.png`, {
-        type: 'image/png',
-      });
       await navigator.share({
-        files: [file],
-        text,
-        title: shareCopy.title,
+        title: 'ARCANA LINK 月諭アルカナ交換',
+        text: shareText('native'),
       });
+      track('share_native', { server: profile.server });
     } catch (error) {
       if ((error as Error).name !== 'AbortError') {
-        window.open(
-          `https://x.com/intent/post?text=${encodeURIComponent(text)}`,
-          '_blank',
-          'noopener,noreferrer',
-        );
+        setToast(locale === 'ja' ? '共有できませんでした。リンクコピーをお使いください。' : 'Could not share. Please copy the link.');
       }
-    } finally {
-      setShareBusy(false);
     }
   }
 
-  async function copyShareText() {
-    await navigator.clipboard.writeText(shareText());
+  async function copyListingUrl() {
+    await navigator.clipboard.writeText(listingShareUrl('copy'));
     track('share_copy', {server:profile.server});
-    setToast(shareCopy.copiedDone);
+    setToast(locale === 'ja' ? '共有リンクをコピーしました' : 'Share link copied');
   }
 
-  const zeroMatchActions = !listingError ? <div className="v2-empty v2-zero-match">
-    <Bell size={24}/><p>{locale==='ja'?'今は完全に条件が一致する相手がいません。募集を公開しておくと、後から条件一致した相手を確認できます。':locale==='en'?'There is no exact match right now. Publish your listing so you can check compatible players later.':'目前没有条件完全一致的伙伴。发布招募后，可以稍后查看新的匹配。'}</p>
-    <div className="v2-empty-actions"><button className="v2-primary" onClick={openProfileSettings} type="button">{locale==='ja'?'交換募集を公開する':locale==='en'?'Publish exchange listing':'发布交换招募'}</button><button className="v2-x-button" onClick={()=>void postToX()} type="button">𝕏 {locale==='ja'?'で募集する':locale==='en'?'Share on X':'发布招募'}</button><button onClick={openExchangeTable} type="button">{locale==='ja'?'交換表を作る':locale==='en'?'Create exchange table':'制作交换表'}</button><button onClick={()=>setNotifications(true)} type="button"><Bell size={16}/>{serverCopy.alerts}</button></div>
+  function tradeSuccessText() {
+    return [
+      '月諭アルカナの交換相手が見つかりました！',
+      '',
+      '求・譲を登録すると、条件が合う相手を自動で探せます👇',
+      '',
+      'ARCANA LINK',
+      'https://arcana-card-link.pages.dev/genshin-arcana?utm_source=trade_success&utm_medium=social',
+      '',
+      '#原神 #原神アルカナ',
+    ].join('\n');
+  }
+
+  function postTradeSuccessToX() {
+    track('trade_completed_share', { server: profile.server });
+    window.open(
+      `https://x.com/intent/post?text=${encodeURIComponent(tradeSuccessText())}`,
+      '_blank',
+      'noopener,noreferrer',
+    );
+  }
+
+  async function shareTradeSuccessNative() {
+    if (typeof navigator.share !== 'function') return;
+    try {
+      await navigator.share({
+        title: 'ARCANA LINKで交換成立',
+        text: tradeSuccessText(),
+      });
+      track('trade_completed_share', { server: profile.server });
+    } catch {
+      // Closing the native share sheet does not need an error message.
+    }
+  }
+
+  const zeroMatchActions = listingsLoaded && !listingError ? <div className="v2-empty v2-zero-match">
+    <Bell size={24}/><p>{locale==='ja'?'今は条件が完全一致する相手がいません。募集を公開しておくと、あとから同じサーバーのユーザーが登録した時にも条件を比較できます。':locale==='en'?'There is no exact match right now. Publish your listing so future players on your server can be compared.':'目前没有条件完全一致的伙伴。发布招募后，可以与之后登记的同服务器玩家比较。'}</p>
+    <small>{locale==='ja'?'今相手がいなくても、公開して待てます。古い募集は7日で候補から外れます。':'You can publish and wait. Listings leave matching after 7 days.'}</small>
+    <div className="v2-empty-actions"><button className="v2-primary" onClick={publishCurrentListing} type="button">{locale==='ja'?'募集を公開して待つ':locale==='en'?'Publish and wait':'发布并等待'}</button><button className="v2-x-button" onClick={()=>void postToX()} type="button">𝕏 {locale==='ja'?'でも募集する':locale==='en'?'Share on X':'在X发布'}</button><button onClick={openExchangeTable} type="button">{locale==='ja'?'交換表を保存する':locale==='en'?'Save exchange table':'保存交换表'}</button></div>
   </div> : null;
 
   return (
@@ -982,7 +1128,7 @@ export function ExchangeHome({
         </button>
       )}
 
-      {newMatchCount>0 && !revisitDismissed && <div className="v2-return-notice"><span>🎉 {locale==='ja'?`前回のアクセス後に${newMatchCount}件の新しい完全マッチがあります`:locale==='en'?`${newMatchCount} new exact match${newMatchCount>1?'es':''} since your last visit`:`上次访问后有${newMatchCount}个新的完全匹配`}</span><a href="#matches" onClick={()=>setRevisitDismissed(true)}>{locale==='ja'?'マッチを見る':'View matches'}</a></div>}
+      {newMatchCount>0 && !revisitDismissed && <div className="v2-return-notice"><span>🎉 {locale==='ja'?`前回のアクセス後に${newMatchCount}件の新しい完全マッチがあります`:locale==='en'?`${newMatchCount} new exact match${newMatchCount>1?'es':''} since your last visit`:`上次访问后有${newMatchCount}个新的完全匹配`}</span><a href="#matches" onClick={markNewMatchesSeen}>{locale==='ja'?'マッチを見る':'View matches'}</a></div>}
 
       {requestedServer &&
         profile.server &&
@@ -1095,6 +1241,7 @@ export function ExchangeHome({
               ),
             )}
           </div>
+          {profile.publicId && profile.status !== 'closed' && lastPublishedAt && !listingExpired && <p className="v2-listing-countdown">{locale==='ja'?`募集期限まであと${listingDaysRemaining}日`:locale==='en'?`${listingDaysRemaining} day${listingDaysRemaining===1?'':'s'} until listing expiry`:`招募还有${listingDaysRemaining}天到期`}</p>}
           {listingExpired ? <div className="v2-expiry-warning is-expired"><p>{locale==='ja'?'この募集は期限切れです。再公開すると、あと7日間マッチ候補に表示されます。':locale==='en'?'This listing has expired. Republish it to appear in matching for another 7 days.':'此招募已过期。重新发布后会在匹配候选中显示7天。'}</p><button disabled={saving} onClick={refreshListing} type="button">{locale==='ja'?'募集を再公開する':locale==='en'?'Republish listing':'重新发布招募'}</button></div> : expiresSoon && <div className="v2-expiry-warning"><p>{locale==='ja'?'募集期限が近づいています。あと1日以内でマッチ候補から外れます。':locale==='en'?'Your listing expires within one day and will leave matching results.':'招募将在1天内到期并从匹配候选中移除。'}</p><button disabled={saving} onClick={refreshListing} type="button">{locale==='ja'?'募集を更新する':locale==='en'?'Refresh listing':'更新招募'}</button></div>}
           <button
             className={`v2-alert-toggle ${notifications ? 'active' : ''}`}
@@ -1163,7 +1310,7 @@ export function ExchangeHome({
             );
           })}
         </div>
-        {reviewComplete && <div className="v2-ready-panel"><div><span className="v2-kicker">READY</span><h3>{locale==='ja'?'交換準備ができました ✓':locale==='en'?'Ready to trade ✓':'交换准备完成 ✓'}</h3><p><b>{locale==='ja'?'求':'Wanted'}：</b>{missing.map(card=>labels[card]).join(' / ')||'—'}</p><p><b>{locale==='ja'?'譲':'Offered'}：</b>{duplicates.map(card=>labels[card]).join(' / ')||'—'}</p><p><b>Server：</b>{activeServerLabel}</p></div><nav><a className="v2-primary" href="#matches">{locale==='ja'?'条件が合う相手を探す':'Find compatible players'}</a><button onClick={openProfileSettings} type="button">{locale==='ja'?'交換募集を公開する':locale==='en'?'Publish exchange listing':'发布交换招募'}</button><button className="v2-x-button" onClick={()=>void postToX()} type="button">𝕏 {locale==='ja'?'で交換募集する':'Share on X'}</button><button onClick={openExchangeTable} type="button">{locale==='ja'?'交換表を保存する':'Save exchange table'}</button></nav></div>}
+        {reviewComplete && <div className="v2-ready-panel"><div><span className="v2-kicker">READY</span><h3>{locale==='ja'?'交換準備ができました ✓':locale==='en'?'Ready to trade ✓':'交换准备完成 ✓'}</h3><p><b>Server：</b>{activeServerLabel}</p><p><b>{locale==='ja'?'求':'Wanted'}：</b>{missing.map(card=>labels[card]).join(' / ')||'—'}</p><p><b>{locale==='ja'?'譲':'Offered'}：</b>{duplicates.map(card=>labels[card]).join(' / ')||'—'}</p></div><nav><a className="v2-primary" href="#matches" onClick={()=>track('match_search',{server:profile.server})}>{locale==='ja'?'条件が合う相手を探す':'Find compatible players'}</a><button className="v2-primary v2-publish-primary" onClick={publishCurrentListing} type="button">{locale==='ja'?'この内容で募集を公開する':locale==='en'?'Publish this listing':'发布此招募'}</button><button className="v2-x-button" onClick={()=>void postToX()} type="button">𝕏 {locale==='ja'?'で交換募集する':'Share on X'}</button><button onClick={openExchangeTable} type="button">{locale==='ja'?'交換表を保存する':'Save exchange table'}</button></nav></div>}
       </section>
 
       <section className="v2-match-section" id="matches">
@@ -1501,7 +1648,7 @@ export function ExchangeHome({
           <button
             className="modal-dismiss"
             aria-label={copy.close}
-            onClick={() => setShareOpen(false)}
+            onClick={() => {setShareOpen(false);setPublishSuccess(false);}}
             type="button"
           />
           <dialog
@@ -1512,18 +1659,19 @@ export function ExchangeHome({
             <header className="dialog-head">
               <div>
                 <span className="v2-kicker">{shareCopy.kicker}</span>
-                <h2 id="share-title">{shareCopy.title}</h2>
+                <h2 id="share-title">{publishSuccess && locale==='ja'?'募集を公開しました ✓':shareCopy.title}</h2>
               </div>
               <button
                 className="dialog-close"
                 aria-label={copy.close}
-                onClick={() => setShareOpen(false)}
+                onClick={() => {setShareOpen(false);setPublishSuccess(false);}}
                 type="button"
               >
                 <X size={18} />
               </button>
             </header>
             <div className="v2-share-body">
+              {publishSuccess && <div className="v2-publish-success"><p><b>Server：</b>{activeServerLabel}</p><p><b>{locale==='ja'?'求':'Wanted'}：</b>{missing.map(card=>labels[card]).join(' / ')||'—'}</p><p><b>{locale==='ja'?'譲':'Offered'}：</b>{duplicates.map(card=>labels[card]).join(' / ')||'—'}</p><p>{locale==='ja'?'この募集を共有すると、交換相手に見つけてもらいやすくなります。':'Share this listing so compatible players can find it.'}</p></div>}
               <ExchangeTable inventory={inventory} server={profile.server} status={profile.status} publicId={(saving ? undefined : profile.publicId)} locale={locale} />
               <div className="v2-share-preview">
                 <div className="v2-share-brand">
@@ -1564,17 +1712,18 @@ export function ExchangeHome({
                   <b>𝕏</b>
                   {shareBusy ? shareCopy.sharing : shareCopy.post}
                 </button>
+                {hydrated && typeof navigator !== 'undefined' && typeof navigator.share === 'function' && <button onClick={() => void shareNative()} type="button"><Share2 size={17}/>{locale==='ja'?'共有する':'Share'}</button>}
                 <button
                   disabled={shareBusy}
                   onClick={() => void saveShareImage()}
                   type="button"
                 >
                   <Download size={17} />
-                  {shareCopy.download}
+                  {publishSuccess && locale==='ja'?'交換表画像を保存':shareCopy.download}
                 </button>
-                <button onClick={() => void copyShareText()} type="button">
+                <button onClick={() => void copyListingUrl()} type="button">
                   <Copy size={17} />
-                  {shareCopy.copied}
+                  {locale==='ja'?'リンクをコピー':'Copy link'}
                 </button>
               </div>
               <p className="v2-share-privacy">
@@ -1695,6 +1844,34 @@ export function ExchangeHome({
                   {copy.report}
                 </button>
               </div>
+            </div>
+          </dialog>
+        </div>
+      )}
+
+      {tradeSuccess && (
+        <div className="modal-backdrop v2-modal-backdrop">
+          <button
+            className="modal-dismiss"
+            aria-label={copy.close}
+            onClick={() => setTradeSuccess(false)}
+            type="button"
+          />
+          <dialog className="dialog v2-dialog v2-success-dialog" open aria-labelledby="success-title">
+            <header className="dialog-head">
+              <div>
+                <span className="v2-kicker">TRADE COMPLETE</span>
+                <h2 id="success-title">🎉 {locale==='ja'?'交換成立！':'Trade complete!'}</h2>
+              </div>
+              <button className="dialog-close" aria-label={copy.close} onClick={()=>setTradeSuccess(false)} type="button"><X size={18}/></button>
+            </header>
+            <div className="v2-success-body">
+              <p>{locale==='ja'?'ARCANA LINKで条件が合う交換相手が見つかりました。同じように探している人へ共有できます。':'You found a compatible trade on ARCANA LINK. Share it with others looking for partners.'}</p>
+              <div className="v2-share-actions">
+                <button className="v2-x-button" onClick={postTradeSuccessToX} type="button">𝕏 {locale==='ja'?'で共有':'Share on X'}</button>
+                {hydrated && typeof navigator !== 'undefined' && typeof navigator.share === 'function' && <button onClick={()=>void shareTradeSuccessNative()} type="button"><Share2 size={17}/>{locale==='ja'?'共有する':'Share'}</button>}
+              </div>
+              <small>{locale==='ja'?'相手のUID・名前・交換内容は共有文に含みません。':'The other player’s name, UID and trade details are not shared.'}</small>
             </div>
           </dialog>
         </div>

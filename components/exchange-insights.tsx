@@ -33,6 +33,11 @@ export function ExchangeInsights({
 }) {
   const labels = cardNames[locale];
   const referenceTime = now || Date.parse(summary.generatedAt);
+  const recentListings = summary.recentListings ?? [];
+  const summarize = (cards: Array<keyof typeof labels>) => {
+    const visible = cards.slice(0, 3).map((card) => labels[card]);
+    return `${visible.join(' / ')}${cards.length > 3 ? ` +${cards.length - 3}` : ''}` || '—';
+  };
   return (
     <section
       className="v2-service-status"
@@ -132,6 +137,45 @@ export function ExchangeInsights({
               </li>
             ))}
           </ul>
+        </div>
+      )}
+      {recentListings.length > 0 && (
+        <div className="v2-recent-listings">
+          <h3>
+            {locale === 'ja'
+              ? '最近の交換募集'
+              : locale === 'zh-cn'
+                ? '最近的交换招募'
+                : 'Recent exchange listings'}
+          </h3>
+          <div>
+            {recentListings.map((listing) => (
+              <article key={listing.publicId}>
+                <header>
+                  <b>🌏 {serverLabels.en[listing.server]}</b>
+                  <small>
+                    {relativeUpdate(locale, listing.updatedAt, referenceTime)}
+                    {locale === 'ja' ? '更新' : ''}
+                  </small>
+                </header>
+                <p>
+                  <span>{locale === 'en' ? 'Wanted' : '求'}</span>
+                  {summarize(listing.wants)}
+                </p>
+                <p>
+                  <span>{locale === 'en' ? 'Offered' : locale === 'ja' ? '譲' : '出'}</span>
+                  {summarize(listing.offers)}
+                </p>
+                <a href={`/genshin-arcana/share/${listing.publicId}`}>
+                  {locale === 'ja'
+                    ? '自分のカードと比較'
+                    : locale === 'zh-cn'
+                      ? '与自己的圣牌比较'
+                      : 'Compare with your cards'}
+                </a>
+              </article>
+            ))}
+          </div>
         </div>
       )}
       <small className="v2-data-scope">

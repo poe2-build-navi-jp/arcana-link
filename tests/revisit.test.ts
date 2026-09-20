@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { arcanaCards } from '../lib/arcana-cards';
-import { countNewExactMatches, getListingTiming } from '../lib/revisit';
+import {
+  countNewExactMatches,
+  getListingDaysRemaining,
+  getListingTiming,
+} from '../lib/revisit';
 
 const now = Date.parse('2026-09-20T00:00:00.000Z');
 
@@ -32,4 +36,11 @@ void test('listing timing changes from active to warning and expired', () => {
     'expires-soon',
   );
   assert.equal(getListingTiming('2026-09-13T00:00:00.000Z', now), 'expired');
+});
+
+void test('listing countdown covers seven days, two days, one day and expiry', () => {
+  assert.equal(getListingDaysRemaining('2026-09-20T00:00:00.000Z', now), 7);
+  assert.equal(getListingDaysRemaining('2026-09-15T00:00:00.000Z', now), 2);
+  assert.equal(getListingDaysRemaining('2026-09-14T00:00:00.000Z', now), 1);
+  assert.equal(getListingDaysRemaining('2026-09-13T00:00:00.000Z', now), 0);
 });
