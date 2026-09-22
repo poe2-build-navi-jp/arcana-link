@@ -63,10 +63,10 @@ export function ExchangeInsights({
         <span>
           <b>{summary.recent}</b>
           {locale === 'ja'
-            ? '今日更新'
+            ? '過去24時間に更新'
             : locale === 'zh-cn'
-              ? '今日更新'
-              : ' updated today'}
+              ? '过去24小时更新'
+              : ' updated in the last 24 hours'}
         </span>
         <span>
           <b>{relativeUpdate(locale, summary.updatedAt, referenceTime)}</b>
@@ -108,7 +108,7 @@ export function ExchangeInsights({
         <div className="v2-popular-pairs">
           <h3>
             {locale === 'ja'
-              ? '最近マッチしやすい組み合わせ'
+              ? '現在、相互条件が一致する組み合わせ'
               : locale === 'zh-cn'
                 ? '最近易匹配的组合'
                 : 'Recently matchable combinations'}
@@ -177,6 +177,14 @@ export function ExchangeInsights({
             ))}
           </div>
         </div>
+      )}
+      {locale === 'ja' && (
+        <details>
+          <summary>集計日時とデータの見方</summary>
+          <p>集計日時：<time dateTime={summary.generatedAt}>{new Intl.DateTimeFormat('ja-JP', {timeZone: 'Asia/Tokyo', dateStyle: 'medium', timeStyle: 'short'}).format(new Date(summary.generatedAt))}</time>（日本時間）。「最終更新」は集計対象の募集が最後に更新された時刻です。</p>
+          <p>ARCANA LINKに登録された、過去7日以内に更新のある受付中募集を集計しています。原神の全プレイヤー数や、他サイトの募集数ではありません。「過去24時間に更新」はこの期間内に更新された対象募集数で、更新操作の回数ではありません。</p>
+          <p>組み合わせの候補数は、同じサーバーで逆向きの求・譲を持つ募集数の小さい方です。同じ募集が複数の組み合わせに含まれる場合があります。交換成立数・成立率・カードの希少性を示すものではありません。</p>
+        </details>
       )}
       <small className="v2-data-scope">
         {locale === 'ja'
