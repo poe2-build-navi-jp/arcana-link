@@ -39,7 +39,7 @@ jobs:
         run: node scripts/prepare-pages.mjs
 
       - name: Deploy production
-        run: pnpm exec wrangler pages deploy dist/client --project-name arcana-card-link --branch main --commit-hash "$GITHUB_SHA"
+        run: pnpm exec wrangler pages deploy ../arcana-link/dist/client --cwd ../.local-deploy --project-name arcana-card-link --branch main --commit-hash "$GITHUB_SHA"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: 6a09a32cba1288cccce5912015086a35
