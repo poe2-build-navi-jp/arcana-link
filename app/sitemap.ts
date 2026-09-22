@@ -22,7 +22,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const mainPages = siteLocales.flatMap((locale) =>
     paths.map((path) => ({
       url: `${base}${localizedPath(locale, path)}`,
-      lastModified: locale === 'ja' && (path === 'genshin-arcana' || path === 'guide' || path === 'arcana')
+      lastModified: locale === 'ja' && (path === 'genshin-arcana' || path === 'guide')
+        ? new Date('2026-09-22')
+        : locale === 'ja' && (path === 'genshin-arcana' || path === 'guide' || path === 'arcana')
         ? updated
         : new Date('2026-09-17'),
       changeFrequency: path === '' ? ('weekly' as const) : ('monthly' as const),
