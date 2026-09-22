@@ -33,6 +33,11 @@ export function ExchangeInsights({
 }) {
   const labels = cardNames[locale];
   const referenceTime = now || Date.parse(summary.generatedAt);
+  const recentListings = summary.recentListings ?? [];
+  const summarize = (cards: Array<keyof typeof labels>) => {
+    const visible = cards.slice(0, 3).map((card) => labels[card]);
+    return `${visible.join(' / ')}${cards.length > 3 ? ` +${cards.length - 3}` : ''}` || '—';
+  };
   return (
     <section
       className="v2-service-status"
@@ -58,10 +63,10 @@ export function ExchangeInsights({
         <span>
           <b>{summary.recent}</b>
           {locale === 'ja'
-            ? '今日更新'
+            ? '過去24時間に更新'
             : locale === 'zh-cn'
-              ? '今日更新'
-              : ' updated today'}
+              ? '过去24小时更新'
+              : ' updated in the last 24 hours'}
         </span>
         <span>
           <b>{relativeUpdate(locale, summary.updatedAt, referenceTime)}</b>
@@ -103,7 +108,7 @@ export function ExchangeInsights({
         <div className="v2-popular-pairs">
           <h3>
             {locale === 'ja'
-              ? '最近マッチしやすい組み合わせ'
+              ? '現在、相互条件が一致する組み合わせ'
               : locale === 'zh-cn'
                 ? '最近易匹配的组合'
                 : 'Recently matchable combinations'}
@@ -133,6 +138,53 @@ export function ExchangeInsights({
             ))}
           </ul>
         </div>
+      )}
+      {recentListings.length > 0 && (
+        <div className="v2-recent-listings">
+          <h3>
+            {locale === 'ja'
+              ? '最近の交換募集'
+              : locale === 'zh-cn'
+                ? '最近的交换招募'
+                : 'Recent exchange listings'}
+          </h3>
+          <div>
+            {recentListings.map((listing) => (
+              <article key={listing.publicId}>
+                <header>
+                  <b>🌏 {serverLabels.en[listing.server]}</b>
+                  <small>
+                    {relativeUpdate(locale, listing.updatedAt, referenceTime)}
+                    {locale === 'ja' ? '更新' : ''}
+                  </small>
+                </header>
+                <p>
+                  <span>{locale === 'en' ? 'Wanted' : '求'}</span>
+                  {summarize(listing.wants)}
+                </p>
+                <p>
+                  <span>{locale === 'en' ? 'Offered' : locale === 'ja' ? '譲' : '出'}</span>
+                  {summarize(listing.offers)}
+                </p>
+                <a href={`/genshin-arcana/share/${listing.publicId}`}>
+                  {locale === 'ja'
+                    ? '自分のカードと比較'
+                    : locale === 'zh-cn'
+                      ? '与自己的圣牌比较'
+                      : 'Compare with your cards'}
+                </a>
+              </article>
+            ))}
+          </div>
+        </div>
+      )}
+      {locale === 'ja' && (
+        <details>
+          <summary>集計日時とデータの見方</summary>
+          <p>集計日時：<time dateTime={summary.generatedAt}>{new Intl.DateTimeFormat('ja-JP', {timeZone: 'Asia/Tokyo', dateStyle: 'medium', timeStyle: 'short'}).format(new Date(summary.generatedAt))}</time>（日本時間）。「最終更新」は集計対象の募集が最後に更新された時刻です。</p>
+          <p>ARCANA LINKに登録された、過去7日以内に更新のある受付中募集を集計しています。原神の全プレイヤー数や、他サイトの募集数ではありません。「過去24時間に更新」はこの期間内に更新された対象募集数で、更新操作の回数ではありません。</p>
+          <p>組み合わせの候補数は、同じサーバーで逆向きの求・譲を持つ募集数の小さい方です。同じ募集が複数の組み合わせに含まれる場合があります。交換成立数・成立率・カードの希少性を示すものではありません。</p>
+        </details>
       )}
       <small className="v2-data-scope">
         {locale === 'ja'

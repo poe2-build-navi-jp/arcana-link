@@ -36,6 +36,14 @@ export type ExchangePairInsight = {
   matches: number;
 };
 
+export type RecentListingInsight = {
+  publicId: string;
+  server: ServerRegion;
+  wants: ArcanaId[];
+  offers: ArcanaId[];
+  updatedAt: string;
+};
+
 export type ExchangeSummary = {
   open: number;
   recent: number;
@@ -43,6 +51,7 @@ export type ExchangeSummary = {
   updatedAt: string | null;
   generatedAt: string;
   popularPairs: ExchangePairInsight[];
+  recentListings: RecentListingInsight[];
 };
 
 export async function readExchangeSummary(): Promise<ExchangeSummary | null> {
@@ -60,12 +69,12 @@ export async function readExchangeSummary(): Promise<ExchangeSummary | null> {
       GROUP BY server`)
       .bind(recent, cutoff)
       .all<{server:string;open_count:number;recent_count:number;updated:string}>();
-    const pairRows = await db.prepare(`SELECT server, inventory_json
+    const pairRows = await db.prepare(`SELECT public_id, server, inventory_json, updated_at
       FROM exchange_profiles
       WHERE status = 'open' AND updated_at >= ? AND json_valid(inventory_json)
       ORDER BY updated_at DESC`)
       .bind(cutoff)
-      .all<{server:string;inventory_json:string}>();
+      .all<{public_id:string;server:string;inventory_json:string;updated_at:string}>();
 
     const servers = Object.fromEntries(serverRegions.map(server => [server, 0])) as Record<ServerRegion, number>;
     let open = 0;
@@ -81,12 +90,22 @@ export async function readExchangeSummary(): Promise<ExchangeSummary | null> {
     }
 
     const conditions = new Map<string, number>();
+    const recentListings: RecentListingInsight[] = [];
     for (const row of pairRows.results) {
       const server = normalizeServerRegion(row.server);
       const inventory = normalizeInventory(JSON.parse(row.inventory_json));
       if (!server || !inventory) continue;
       const wants = arcanaIds.filter(card => inventory[card] === 0);
       const offers = arcanaIds.filter(card => inventory[card] >= 2);
+      if (recentListings.length < 5 && (wants.length || offers.length)) {
+        recentListings.push({
+          publicId: row.public_id,
+          server,
+          wants,
+          offers,
+          updatedAt: row.updated_at,
+        });
+      }
       for (const want of wants) for (const offer of offers) {
         const key = `${server}|${want}|${offer}`;
         conditions.set(key, (conditions.get(key) ?? 0) + 1);
@@ -114,6 +133,7 @@ export async function readExchangeSummary(): Promise<ExchangeSummary | null> {
       updatedAt,
       generatedAt: new Date().toISOString(),
       popularPairs: popularPairs.slice(0, 5),
+      recentListings,
     };
   } catch { return null; }
 }

@@ -4,17 +4,28 @@ import { ArticleShell } from '@/components/public-shell';
 import { arcanaCards, cardSlugById } from '@/lib/arcana-cards';
 import { cardNames, languageAlternates, romans } from '@/lib/site-i18n';
 export const metadata: Metadata = {
-  title: '原神 月諭アルカナ全22種類一覧｜交換ページ付き | ARCANA LINK',
+  title:
+    '原神 月諭のアルカナ22種類一覧｜カード名・番号・交換状況 | ARCANA LINK',
   description:
-    '原神「月諭のアルカナ」全22種類を一覧で確認。各アルカナの交換募集ページから、探している人・出せる人を確認できます。',
+    '原神「月諭のアルカナ」全22種類を番号順に一覧掲載。各カードの名称と現在の交換状況を確認し、不足カードの交換相手を探せます。',
   alternates: { canonical: '/arcana', languages: languageAlternates('arcana') },
+  openGraph: {
+    title: '原神 月諭のアルカナ22種類一覧｜カード名・番号・交換状況',
+    description:
+      '月諭のアルカナ全22種類を番号順に確認し、カード別の交換状況へ進めます。',
+    url: '/arcana',
+  },
+  twitter: {
+    card: 'summary',
+    title: '原神 月諭のアルカナ22種類一覧 | ARCANA LINK',
+  },
 };
 export default function Arcana() {
   return (
     <ArticleShell
       kicker="COLLECTION"
-      title="原神 月諭アルカナ全22種類一覧"
-      lead="交換募集で使う名称を、アルカナ番号順に確認できます。似た名称の入力間違い防止にお使いください。"
+      title="原神 月諭のアルカナ22種類一覧｜番号・名称・交換状況"
+      lead="原神「月諭のアルカナ」全22種類を番号順に確認できます。不足しているカードや重複カードを確認し、各カードページから現在の交換状況や交換相手を探せます。"
       path="arcana"
     >
       <section>
@@ -45,8 +56,12 @@ export default function Arcana() {
       </section>
       <aside className="related">
         <h2>すぐに探す</h2>
-        <a href="/">手持ちから交換相手をマッチング →</a>
-        <a href="/genshin-arcana/lunar-mode">幻想シアター月諭モードの入手条件 →</a>
+        <a href="/genshin-arcana">月諭アルカナの交換方法を確認 →</a>
+        <a href="/">22種類を登録して交換相手を探す →</a>
+        <a href="/genshin-arcana/exchange-table">求・譲の交換表を作る →</a>
+        <a href="/genshin-arcana/lunar-mode">
+          幻想シアター月諭モードの入手条件 →
+        </a>
       </aside>
     </ArticleShell>
   );

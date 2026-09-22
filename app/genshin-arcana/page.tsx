@@ -53,7 +53,7 @@ export default async function GenshinArcana() {
     description:
       '原神の月諭アルカナ交換をする前に必要な準備と、条件の合う相手の探し方を解説します。',
     datePublished: '2026-09-05',
-    dateModified: '2026-09-19',
+    dateModified: '2026-09-22',
     author: { '@type': 'Organization', name: 'ARCANA LINK運営' },
     publisher: { '@type': 'Organization', name: 'ARCANA LINK' },
     mainEntityOfPage: 'https://arcana-card-link.pages.dev/genshin-arcana',
@@ -70,6 +70,12 @@ export default async function GenshinArcana() {
         lead="月諭のアルカナで欲しい一枚を探したい人へ。交換前の準備、条件の登録、実際にフレンドと交換するまでの流れをまとめました。"
         path="genshin-arcana"
       >
+        <section aria-labelledby="service-answer">
+          <h2 id="service-answer">アルカナ交換相手はどう探す？</h2>
+          <p>ARCANA LINKは、原神「月諭のアルカナ」の交換相手を探す非公式ツールです。サーバーを選び、22種類の所持数を登録すると、同じサーバーでお互いの求・譲が一致する公開募集を確認できます。実際のカード交換は原神のゲーム内で行います。</p>
+          <p>0枚は「求」、2枚以上は「譲」として判定します。「完全マッチ」は登録条件の一致であり、相手の承諾や交換成立を保証するものではありません。</p>
+          <nav className="seo-actions"><a href="/#inventory">カードを登録して相手を探す</a><a href="/guide#match">具体例で完全マッチを確認する</a></nav>
+        </section>
         <nav className="toc">
           <b>このページの内容</b>
           <a href="#what">原神の月諭アルカナとは</a>
@@ -113,8 +119,7 @@ export default async function GenshinArcana() {
         <section id="find">
           <h2>原神のアルカナ交換募集を探す方法</h2>
           <p>
-            一般的な掲示板では、古い募集が新着投稿の後ろに流れてしまいます。ARCANA
-            LINKでは募集投稿を探す必要がありません。自分の所持数を登録すると、相手が出せるカードと自分の重複カードが相互に一致する「完全マッチ」を優先表示します。
+            同じサーバーを選択して所持数を登録すると、双方の欲しいカードと出せるカードを自動比較します。過去7日以内に更新された受付中募集から、相互に条件が一致する「完全マッチ」を優先表示します。
           </p>
           <ol className="numbered">
             <li>
@@ -178,7 +183,7 @@ export default async function GenshinArcana() {
             LINK運営が独自に整理したものです。第三者の画像、ロゴ、音楽、物語文、キャラクター素材は掲載していません。当サイトは非公式であり、対象ゲームの開発・運営会社とは関係ありません。
           </p>
         </section>
-        <p className="updated">公開日：2026年9月5日 / 最終更新：2026年9月19日</p>
+        <p className="updated">公開日：2026年9月5日 / 最終更新：2026年9月22日</p>
       </ArticleShell>
     </>
   );
