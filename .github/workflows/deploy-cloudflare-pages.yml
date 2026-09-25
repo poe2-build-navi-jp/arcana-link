@@ -39,14 +39,7 @@ jobs:
         run: node scripts/prepare-pages.mjs
 
       - name: Deploy production
-        run: |
-          CLOUDFLARE_API_TOKEN="$(printf '%s' "$RAW_CLOUDFLARE_API_TOKEN" | tr -cs 'A-Za-z0-9_-' '\n' | awk 'length($0) >= 35 && length($0) > length(best) { best=$0 } END { print best }')"
-          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
-            echo "Cloudflare API token was not found in the repository secret."
-            exit 1
-          fi
-          export CLOUDFLARE_API_TOKEN
-          pnpm exec wrangler pages deploy dist/client --project-name arcana-card-link --branch main --commit-hash "$GITHUB_SHA"
+        run: pnpm exec wrangler pages deploy dist/client --project-name arcana-card-link --branch main --commit-hash "$GITHUB_SHA"
         env:
-          RAW_CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: 6a09a32cba1288cccce5912015086a35
