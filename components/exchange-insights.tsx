@@ -1,5 +1,5 @@
 import type { ExchangeSummary } from '@/lib/arcana-db';
-import { cardNames, type SiteLocale } from '@/lib/site-i18n';
+import { cardNames, localizedPath, type SiteLocale } from '@/lib/site-i18n';
 import { serverLabels, serverRegions } from '@/lib/server-region';
 
 function relativeUpdate(locale: SiteLocale, value: string | null, now: number) {
@@ -96,13 +96,36 @@ export function ExchangeInsights({
           </ul>
         </div>
       ) : (
-        <p>
-          {locale === 'ja'
-            ? '現在、受付中の公開募集はありません。'
-            : locale === 'zh-cn'
-              ? '目前没有公开招募。'
-              : 'There are no open public listings.'}
-        </p>
+        <div className="v2-first-listing">
+          <h3>
+            {locale === 'ja'
+              ? '先行募集を受付中'
+              : locale === 'zh-cn'
+                ? '正在接受首批招募'
+                : 'Early listings are open'}
+          </h3>
+          <p>
+            {locale === 'ja'
+              ? '欲しいアルカナと余っているアルカナを選ぶだけ。交換表を作成し、そのまま同じ条件でマッチ待ちできます。'
+              : locale === 'zh-cn'
+                ? '选择想要和多余的圣牌，制作交换表后即可等待自动匹配。'
+                : 'Select missing cards and duplicates, create a trade list, and wait for automatic matches.'}
+          </p>
+          <a href={`${localizedPath(locale)}#quick-create`}>
+            {locale === 'ja'
+              ? '30秒で交換募集を作る'
+              : locale === 'zh-cn'
+                ? '30秒制作交换招募'
+                : 'Create a trade listing in 30 seconds'}
+          </a>
+          <small>
+            {locale === 'ja'
+              ? '現在の受付中募集：0件'
+              : locale === 'zh-cn'
+                ? '当前公开招募：0条'
+                : 'Current open listings: 0'}
+          </small>
+        </div>
       )}
       {summary.popularPairs.length > 0 && (
         <div className="v2-popular-pairs">
