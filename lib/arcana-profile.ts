@@ -22,6 +22,20 @@ export const defaultInventory = Object.fromEntries(
   arcanaIds.map((card) => [card, 0]),
 ) as InventoryCounts;
 
+export function inventoryFromQuickSelection(
+  missingCards: Iterable<ArcanaId>,
+  duplicateCards: Iterable<ArcanaId>,
+): InventoryCounts {
+  const missing = new Set(missingCards);
+  const duplicates = new Set(duplicateCards);
+  return Object.fromEntries(
+    arcanaIds.map((card) => [
+      card,
+      missing.has(card) ? 0 : duplicates.has(card) ? 2 : 1,
+    ]),
+  ) as InventoryCounts;
+}
+
 export function normalizeInventory(value: unknown): InventoryCounts | null {
   if (!value || typeof value !== 'object') return null;
   const record = value as Record<string, unknown>;

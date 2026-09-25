@@ -7,6 +7,7 @@ import {
 } from '../lib/matching';
 import { arcanaIds, type ArcanaId, type SiteLocale } from '../lib/site-i18n';
 import {
+  inventoryFromQuickSelection,
   type InventoryCounts,
   type ExchangeProfile,
 } from '../lib/arcana-profile';
@@ -91,4 +92,12 @@ test('changing server immediately changes the compatible candidate set', () => {
     ),
     ['america'],
   );
+});
+
+test('quick selection converts missing, duplicate and remaining cards', () => {
+  const inventory = inventoryFromQuickSelection(['世界'], ['月', '太陽']);
+  assert.equal(inventory['世界'], 0);
+  assert.equal(inventory['月'], 2);
+  assert.equal(inventory['太陽'], 2);
+  assert.equal(inventory['魔術師'], 1);
 });
