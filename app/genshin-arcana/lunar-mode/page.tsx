@@ -5,13 +5,13 @@ import { ArticleShell } from '@/components/public-shell';
 const canonical = '/genshin-arcana/lunar-mode';
 
 export const metadata: Metadata = {
-  title: '原神 幻想シアター月諭モード攻略｜アルカナ入手条件 | ARCANA LINK',
+  title: '原神 幻想シアターの月諭モード｜アルカナ入手条件・手順 | ARCANA LINK',
   description:
     '原神の幻想シアター「月諭モード」で月諭のアルカナを入手する条件を解説。参加条件、アルカナ挑戦、10幕クリアまでの確認点と、入手できない時のチェック項目をまとめています。',
   alternates: { canonical },
   robots: { index: true, follow: true },
   openGraph: {
-    title: '原神 幻想シアター月諭モード攻略｜アルカナ入手条件',
+    title: '原神 幻想シアターの月諭モード｜アルカナ入手条件・手順',
     description:
       '月諭モードの参加条件、アルカナ挑戦、10幕クリアまでの確認点を整理。',
     type: 'article',
@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary',
-    title: '原神 幻想シアター月諭モード攻略｜アルカナ入手条件',
+    title: '原神 幻想シアターの月諭モード｜アルカナ入手条件・手順',
     description: '月諭のアルカナを入手するまでの条件と確認手順を解説。',
   },
 };
@@ -29,7 +29,7 @@ const faq = [
   {
     question: '月諭モードをクリアするだけでアルカナを入手できますか？',
     answer:
-      '公演のクリアだけでなく、月諭モード中に表示されるアルカナ挑戦の達成も確認してください。報酬条件は更新される可能性があるため、挑戦前にゲーム内の説明を優先してください。',
+      '第十幕のクリアだけではなく、すべてのアルカナ挑戦を完了している必要があります。公式告知では、両方を満たすと月諭のアルカナを引けると案内されています。',
   },
   {
     question: '月諭モードが表示されないのはなぜですか？',
@@ -49,12 +49,14 @@ export default function LunarModeGuide() {
     '@graph': [
       {
         '@type': 'Article',
-        headline: '原神 幻想シアター月諭モード攻略｜アルカナ入手条件',
+        headline: '原神 幻想シアターの月諭モード｜アルカナ入手条件・手順',
         description:
           '幻想シアター月諭モードの参加条件と、月諭のアルカナを入手するまでの確認手順。',
         datePublished: '2026-09-19',
-        dateModified: '2026-09-19',
-        author: { '@type': 'Organization', name: 'ARCANA LINK運営' },
+        dateModified: '2026-09-26',
+        citation: 'https://genshin.hoyoverse.com/ja/news/detail/159349',
+        inLanguage: 'ja',
+        author: { '@type': 'Organization', name: 'ARCANA LINK運営', url: 'https://arcana-card-link.pages.dev/about' },
         publisher: { '@type': 'Organization', name: 'ARCANA LINK' },
         mainEntityOfPage: `https://arcana-card-link.pages.dev${canonical}`,
       },
@@ -100,16 +102,28 @@ export default function LunarModeGuide() {
       />
       <ArticleShell
         kicker="IMAGINARIUM THEATER"
-        title="原神 幻想シアター月諭モード攻略"
+        title="原神 幻想シアターの月諭モードとアルカナ入手方法"
         lead="月諭のアルカナを取り逃さないために、参加前の準備からアルカナ挑戦、10幕クリア後の確認までを順番に整理します。"
         path="genshin-arcana"
       >
+        <section aria-labelledby="theater-answer">
+          <h2 id="theater-answer">幻想シアターでアルカナを入手するには？</h2>
+          <p>原神の幻想シアターでは、月諭モードですべての「アルカナ挑戦」を完了し、第十幕をクリアすると「月諭のアルカナ」を引けます。公演を進めるだけでなく、途中に発生するアルカナ挑戦を完了しているかが確認点です。</p>
+          <p>出典：<a href="https://genshin.hoyoverse.com/ja/news/detail/159349">原神公式「Luna Ⅰ」バージョンアップのお知らせ</a>（入手条件・交換仕様）。</p>
+          <dl>
+            <dt><b>幻想シアター</b></dt><dd>出演条件に合うキャラクターで公演を進める原神の戦闘コンテンツ。</dd>
+            <dt><b>月諭モード</b></dt><dd>幻想シアターの難易度の一つ。アルカナ入手の対象モード。</dd>
+            <dt><b>アルカナ挑戦</b></dt><dd>月諭モード中に発生する挑戦イベント。集めるカードそのものとは異なる。</dd>
+            <dt><b>月諭のアルカナ</b></dt><dd>条件を満たして入手するコレクション。<a href="/arcana">22種類の番号・名称一覧</a>で所持状況を整理できる。</dd>
+          </dl>
+        </section>
         <nav className="toc">
           <b>このページの内容</b>
           <a href="#conditions">月諭モードの参加条件</a>
           <a href="#get-arcana">アルカナの入手手順</a>
           <a href="#challenge">アルカナ挑戦の注意点</a>
           <a href="#missing">入手できない時の確認</a>
+          <a href="#next-action">今の状態から次にすること</a>
           <a href="#after">重複したアルカナの整理</a>
           <a href="#faq">よくある質問</a>
         </nav>
@@ -127,14 +141,14 @@ export default function LunarModeGuide() {
         <section id="conditions">
           <h2>幻想シアター月諭モードの参加条件</h2>
           <p>
-            月諭モードへ進む前に、直前の難易度をクリアし、出場可能なキャラクターを必要数そろえる必要があります。目安はレベル70以上のキャラクターを28人以上編成できる状態ですが、開幕キャストや特別招待キャストを含む扱いは開催期の画面を確認してください。
+            月諭モードへ進む前に、直前の難易度をクリアし、出場可能なキャラクターを必要数そろえる必要があります。必要人数・レベル・開幕キャストや特別招待キャストの扱いは、開催期の編成画面で確認してください。
           </p>
           <div className="checklist">
             <b>挑戦前チェック</b>
             <ul>
               <li>マスターモードのクリア状況を確認する</li>
               <li>当期の対象元素と出場可能キャラクターを確認する</li>
-              <li>レベル70以上の編成人数が不足していないか確認する</li>
+              <li>必要なレベルと編成人数を参加画面で確認する</li>
               <li>主力を序盤だけで使い切らないよう役割を分ける</li>
               <li>ゲーム内の月諭モード報酬条件を読み直す</li>
             </ul>
@@ -191,6 +205,18 @@ export default function LunarModeGuide() {
           </p>
         </section>
 
+        <section id="next-action">
+          <h2>シアターの進行状況から次にすること</h2>
+          <p>入手前と入手後では確認する内容が違います。今の状態に合う手順へ進んでください。</p>
+          <ul>
+            <li><b>月諭モードへ進めない：</b><a href="#conditions">参加条件</a>でクリア状況・出場条件を確認。</li>
+            <li><b>第十幕をクリアしたが引けない：</b><a href="#missing">アルカナ挑戦と当期の受け取り状況</a>を確認。</li>
+            <li><b>所持カードを整理したい：</b><a href="/arcana">全22種類一覧</a>で不足・重複を確認。</li>
+            <li><b>同じカードが余った：</b><a href="/genshin-arcana#steps">月諭の箱を使う交換方法</a>を確認し、<a href="/#inventory">交換相手を探す</a>。</li>
+            <li><b>交換相手が見つからない：</b><a href="/genshin-arcana/exchange-table">求・譲の交換表</a>を作って募集条件を共有。</li>
+          </ul>
+          <p>募集数・求人数・譲人数はARCANA LINK内の登録データです。原神の全プレイヤーの所持率や、ゲーム内の抽選確率を示すものではありません。</p>
+        </section>
         <section id="after">
           <h2>重複したアルカナは交換候補にする</h2>
           <p>
@@ -216,12 +242,13 @@ export default function LunarModeGuide() {
         </section>
 
         <section>
-          <h2>情報の確認方針</h2>
+          <h2>出典・情報の確認方針</h2>
+          <p>編集：<a href="/about">ARCANA LINK運営</a>。公式の基本仕様と、当サイトが提案する確認順・所持数の整理方法を区別して掲載しています。<a href="/contact">お問い合わせ・訂正依頼</a>も受け付けています。</p>
           <p>
             本ページは、幻想シアターからアルカナ交換へ進む人が迷いやすい条件をARCANA LINK運営が独自に整理したものです。開催期やアップデートで変わる対象元素、敵、キャラクター条件は固定情報として掲載せず、ゲーム内の最新表示を優先します。当サイトは非公式であり、対象ゲームの開発・運営会社とは関係ありません。
           </p>
         </section>
-        <p className="updated">公開日：2026年9月19日 / 最終更新：2026年9月19日</p>
+        <p className="updated">公開日：2026年9月19日 / 最終更新：2026年9月26日</p>
       </ArticleShell>
     </>
   );

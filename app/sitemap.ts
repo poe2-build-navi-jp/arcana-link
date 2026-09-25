@@ -22,7 +22,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const mainPages = siteLocales.flatMap((locale) =>
     paths.map((path) => ({
       url: `${base}${localizedPath(locale, path)}`,
-      lastModified: locale === 'ja' && (path === 'genshin-arcana' || path === 'guide')
+      lastModified: locale === 'ja' && path === 'genshin-arcana'
+        ? new Date('2026-09-26')
+        : locale === 'ja' && path === 'guide'
         ? new Date('2026-09-22')
         : locale === 'ja' && (path === 'genshin-arcana' || path === 'guide' || path === 'arcana')
         ? updated
@@ -44,6 +46,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...cardPages,
     {url:base+'/contact',lastModified:new Date('2026-09-17'),changeFrequency:'monthly',priority:0.3},
     {url:base+'/genshin-arcana/exchange-table',lastModified:new Date('2026-09-17'),changeFrequency:'monthly',priority:0.8},
-    {url:base+'/genshin-arcana/lunar-mode',lastModified:updated,changeFrequency:'monthly',priority:0.85},
+    {url:base+'/genshin-arcana/lunar-mode',lastModified:new Date('2026-09-26'),changeFrequency:'monthly',priority:0.85},
   ];
 }

@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
   title: '原神 月諭アルカナ交換のやり方｜募集・相手の探し方 | ARCANA LINK',
   description:
-    '原神の月諭アルカナの交換相手を探す方法を解説。欲しいアルカナ、出せるアルカナ、サーバー、UIDから条件の合う相手を見つけられます。',
+    '原神「月諭のアルカナ」とは何か、幻想シアターでの入手条件、月諭の箱を使う交換方法を解説。同じサーバーの求・譲が合う相手探しと22種類一覧にも対応。',
   alternates: {
     canonical: '/genshin-arcana',
     languages: languageAlternates('genshin-arcana'),
@@ -28,7 +28,7 @@ export const metadata: Metadata = {
 const faq = [
   {
     q: '原神のアルカナはどこで入手できますか？',
-    a: '幻想シアターの月諭モードを進め、対象のアルカナ挑戦と公演を完了することで入手できます。最新の条件は必ずゲーム内の表示を確認してください。',
+    a: '幻想シアターの月諭モードで、すべてのアルカナ挑戦を完了してから第十幕をクリアすると、月諭のアルカナを引けます。開催期ごとの詳細はゲーム内の報酬表示で確認してください。',
   },
   {
     q: 'アルカナはサイト上で交換できますか？',
@@ -53,8 +53,10 @@ export default async function GenshinArcana() {
     description:
       '原神の月諭アルカナ交換をする前に必要な準備と、条件の合う相手の探し方を解説します。',
     datePublished: '2026-09-05',
-    dateModified: '2026-09-22',
-    author: { '@type': 'Organization', name: 'ARCANA LINK運営' },
+    dateModified: '2026-09-26',
+    citation: 'https://genshin.hoyoverse.com/ja/news/detail/159349',
+    inLanguage: 'ja',
+    author: { '@type': 'Organization', name: 'ARCANA LINK運営', url: 'https://arcana-card-link.pages.dev/about' },
     publisher: { '@type': 'Organization', name: 'ARCANA LINK' },
     mainEntityOfPage: 'https://arcana-card-link.pages.dev/genshin-arcana',
   };
@@ -70,6 +72,17 @@ export default async function GenshinArcana() {
         lead="月諭のアルカナで欲しい一枚を探したい人へ。交換前の準備、条件の登録、実際にフレンドと交換するまでの流れをまとめました。"
         path="genshin-arcana"
       >
+        <section aria-labelledby="arcana-answer">
+          <h2 id="arcana-answer">原神のアルカナとは？入手・交換の要点</h2>
+          <p>原神「月諭のアルカナ」は、幻想シアターの月諭モードで集める全22種類のコレクションです。すべてのアルカナ挑戦を終えて第十幕をクリアすると抽選でき、フレンドとの交換にはゲーム内アイテム「月諭の箱」を使います。</p>
+          <ul>
+            <li><b>入手：</b>月諭モードでアルカナ挑戦をすべて完了し、第十幕をクリアする。</li>
+            <li><b>交換：</b>同じサーバーのフレンドとマルチプレイ中に「月諭の箱」を使う。塵歌壺の中は対象外。</li>
+            <li><b>相手探し：</b>足りない種類と余っている種類を整理し、お互いの求・譲が合う人を探す。</li>
+          </ul>
+          <p>入手・交換仕様の出典：<a href="https://genshin.hoyoverse.com/ja/news/detail/159349">原神公式「Luna Ⅰ」バージョンアップのお知らせ</a>。開催期ごとの条件はゲーム内表示を優先してください。</p>
+          <nav className="seo-actions"><a href="/genshin-arcana/lunar-mode">幻想シアターの入手条件を確認する</a><a href="/arcana">番号順に22種類を見る</a></nav>
+        </section>
         <section aria-labelledby="service-answer">
           <h2 id="service-answer">アルカナ交換相手はどう探す？</h2>
           <p>ARCANA LINKは、原神「月諭のアルカナ」の交換相手を探す非公式ツールです。サーバーを選び、22種類の所持数を登録すると、同じサーバーでお互いの求・譲が一致する公開募集を確認できます。実際のカード交換は原神のゲーム内で行います。</p>
@@ -150,7 +163,7 @@ export default async function GenshinArcana() {
         <section id="steps">
           <h2>フレンドとアルカナを交換する手順</h2>
           <p>
-            条件が合ったらUIDからフレンド申請を行い、交換するカードと合流時間を確認します。マルチプレイで同じ世界に合流した後、ゲーム内の交換機能でお互いにカードを選択します。確定ボタンを押す前に、種類と枚数が事前の約束と合っているかを両者で確認しましょう。
+            条件が合ったらUIDからフレンド申請を行い、交換するカードと合流時間を確認します。マルチプレイで同じ世界に合流した後、「塵歌壺」の外で「月諭の箱」を使い、フレンドへ交換招待を送ります。ゲーム内の案内に従ってお互いにカードを選択します。確定ボタンを押す前に、種類と枚数が事前の約束と合っているかを両者で確認しましょう。
           </p>
           <p>
             パスワードや認証コードは交換に必要ありません。これらの情報を求められた場合は交換を中止し、アカウントの安全を優先してください。
@@ -178,12 +191,13 @@ export default async function GenshinArcana() {
         </section>
         <section>
           <h2>本ページの編集方針</h2>
+          <p>編集：<a href="/about">ARCANA LINK運営</a>。ゲーム仕様は上記公式告知、求・譲や7日の募集期限は当サイトの仕様に基づきます。記載に誤りがある場合は<a href="/contact">お問い合わせ・訂正依頼</a>からお知らせください。</p>
           <p>
             このページは、交換をする人が必要とする手順と安全上の注意点をARCANA
             LINK運営が独自に整理したものです。第三者の画像、ロゴ、音楽、物語文、キャラクター素材は掲載していません。当サイトは非公式であり、対象ゲームの開発・運営会社とは関係ありません。
           </p>
         </section>
-        <p className="updated">公開日：2026年9月5日 / 最終更新：2026年9月22日</p>
+        <p className="updated">公開日：2026年9月5日 / 最終更新：2026年9月26日</p>
       </ArticleShell>
     </>
   );
