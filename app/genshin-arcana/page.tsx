@@ -2,6 +2,7 @@
 import type { Metadata } from 'next';
 import { ExchangeInsights } from '@/components/exchange-insights';
 import { ArticleShell } from '@/components/public-shell';
+import { SeoFigure } from '@/components/seo-figure';
 import { readExchangeSummary } from '@/lib/arcana-db';
 import { languageAlternates } from '@/lib/site-i18n';
 
@@ -54,6 +55,7 @@ export default async function GenshinArcana() {
       '原神の月諭アルカナ交換をする前に必要な準備と、条件の合う相手の探し方を解説します。',
     datePublished: '2026-09-05',
     dateModified: '2026-09-26',
+    image: 'https://arcana-card-link.pages.dev/images/arcana-trade-reciprocal-match.svg',
     citation: 'https://genshin.hoyoverse.com/ja/news/detail/159349',
     inLanguage: 'ja',
     author: { '@type': 'Organization', name: 'ARCANA LINK運営', url: 'https://arcana-card-link.pages.dev/about' },
@@ -89,6 +91,13 @@ export default async function GenshinArcana() {
           <p>0枚は「求」、2枚以上は「譲」として判定します。「完全マッチ」は登録条件の一致であり、相手の承諾や交換成立を保証するものではありません。</p>
           <nav className="seo-actions"><a href="/#inventory">カードを登録して相手を探す</a><a href="/guide#match">具体例で完全マッチを確認する</a></nav>
         </section>
+        <SeoFigure
+          src="/images/arcana-trade-reciprocal-match.svg"
+          alt="月諭アルカナ交換で22種類の所持数を登録し、同じサーバーの相手と双方の求・譲を照合して完全マッチを探す流れ"
+          caption="交換条件の例です。実際の募集人数や交換成立を示すものではありません。"
+          width={1200}
+          height={790}
+        />
         <nav className="toc">
           <b>このページの内容</b>
           <a href="#what">原神の月諭アルカナとは</a>

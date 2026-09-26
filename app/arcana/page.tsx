@@ -1,6 +1,7 @@
 /* oxlint-disable next/no-html-link-for-pages -- Native navigation avoids a vinext client-link runtime failure. */
 import type { Metadata } from 'next';
 import { ArticleShell } from '@/components/public-shell';
+import { SeoFigure } from '@/components/seo-figure';
 import { arcanaCards, cardSlugById } from '@/lib/arcana-cards';
 import { cardNames, languageAlternates, romans } from '@/lib/site-i18n';
 export const metadata: Metadata = {
@@ -35,6 +36,13 @@ export default function Arcana() {
           LINKでは、同じ番号のカードが重複しないよう、番号と日本語名の組み合わせで管理しています。相手とやり取りするときも、名称だけでなく番号まで確認すると安心です。
         </p>
       </section>
+      <SeoFigure
+        src="/images/genshin-lunar-arcana-22-card-list.svg"
+        alt="原神の月諭アルカナ全22種類をIの魔術師からXXIIの愚者まで番号順に並べた名称一覧。Vは聖職者"
+        caption="番号と名称を一覧で確認できます。各カードの交換状況は、下のカード別リンクから確認してください。"
+        width={1200}
+        height={1120}
+      />
       <div className="arcana-catalog">
         {arcanaCards.map((card, index) => (
           <a href={`/genshin-arcana/${cardSlugById[card.id]}`} key={card.id}>

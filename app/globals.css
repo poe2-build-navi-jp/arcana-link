@@ -2814,3 +2814,10 @@ footer > span {
 @media(max-width:700px){.v2-quick-create{padding:16px}.v2-quick-head{display:block}.v2-quick-head ol{display:grid;grid-template-columns:repeat(3,1fr);margin-top:12px}.v2-quick-head li{text-align:center}.v2-quick-servers{grid-template-columns:1fr 1fr}.v2-quick-cards{grid-template-columns:1fr 1fr}.v2-quick-cards button{grid-template-columns:auto 24px 1fr;min-width:0;padding:7px;font-size:12px}.v2-quick-actions{align-items:stretch;flex-direction:column-reverse}.v2-quick-actions button,.v2-detail-toggle{width:100%}.v2-shared-draft{width:calc(100% - 28px);padding:16px}}
 @media(max-width:390px){.v2-quick-cards{grid-template-columns:1fr}.v2-quick-cards button{font-size:14px}}
 @media(max-width:430px){.v2-count-options{grid-template-columns:repeat(4,minmax(0,1fr))}.v2-count-options button{width:100%}.v2-service-totals{grid-template-columns:1fr 1fr}.v2-service-totals span:last-child{grid-column:1/-1}.v2-server-activity ul{grid-template-columns:1fr 1fr}}
+
+.arcana-image-figure{margin:28px 0 42px}
+.arcana-image-figure a{display:block;max-width:100%;line-height:0}
+.arcana-image-figure img{display:block;width:100%;height:auto;border-radius:14px;background:#102b48}
+.arcana-image-figure figcaption{padding-top:11px;color:#536a7d;font-size:14px;line-height:1.65}
+.home-image-figure{width:min(1180px,calc(100% - 56px));margin:32px auto}
+@media(max-width:700px){.home-image-figure{width:calc(100% - 28px)}}

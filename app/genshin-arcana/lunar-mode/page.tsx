@@ -1,6 +1,7 @@
 /* oxlint-disable next/no-html-link-for-pages -- Native navigation avoids a vinext client-link runtime failure. */
 import type { Metadata } from 'next';
 import { ArticleShell } from '@/components/public-shell';
+import { SeoFigure } from '@/components/seo-figure';
 
 const canonical = '/genshin-arcana/lunar-mode';
 
@@ -54,6 +55,7 @@ export default function LunarModeGuide() {
           '幻想シアター月諭モードの参加条件と、月諭のアルカナを入手するまでの確認手順。',
         datePublished: '2026-09-19',
         dateModified: '2026-09-26',
+        image: 'https://arcana-card-link.pages.dev/images/genshin-theater-lunar-arcana-steps.svg',
         citation: 'https://genshin.hoyoverse.com/ja/news/detail/159349',
         inLanguage: 'ja',
         author: { '@type': 'Organization', name: 'ARCANA LINK運営', url: 'https://arcana-card-link.pages.dev/about' },
@@ -117,6 +119,13 @@ export default function LunarModeGuide() {
             <dt><b>月諭のアルカナ</b></dt><dd>条件を満たして入手するコレクション。<a href="/arcana">22種類の番号・名称一覧</a>で所持状況を整理できる。</dd>
           </dl>
         </section>
+        <SeoFigure
+          src="/images/genshin-theater-lunar-arcana-steps.svg"
+          alt="幻想シアター月諭モードでアルカナ挑戦をすべて完了し、第十幕をクリアして月諭のアルカナを引くまでの手順"
+          caption="入手手順の図解です。開催期ごとの条件はゲーム内の案内を確認してください。"
+          width={1200}
+          height={760}
+        />
         <nav className="toc">
           <b>このページの内容</b>
           <a href="#conditions">月諭モードの参加条件</a>

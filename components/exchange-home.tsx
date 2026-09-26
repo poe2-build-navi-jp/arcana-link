@@ -1,4 +1,5 @@
 'use client';
+import { SeoFigure } from '@/components/seo-figure';
 /* oxlint-disable next/no-html-link-for-pages -- Native navigation avoids a vinext client-link runtime failure. */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -1597,6 +1598,14 @@ export function ExchangeHome({
         )}
       </section>
 
+      {locale === 'ja' && <SeoFigure
+        className="home-image-figure"
+        src="/images/arcana-trade-reciprocal-match.svg"
+        alt="原神の月諭アルカナ22種類を登録して同じサーバーの相手と求・譲の双方を比較する自動マッチングの図解"
+        caption="完全マッチの仕組みを示す例です。実際の募集件数ではありません。"
+        width={1200}
+        height={790}
+      />}
       <aside className="v2-guide-card">
         <ShieldCheck size={24} />
         <div>
