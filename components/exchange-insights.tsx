@@ -1,3 +1,5 @@
+import { sharedTradeUrl } from '@/lib/trade-sharing';
+import { inventoryFromQuickSelection } from '@/lib/arcana-profile';
 import type { ExchangeSummary } from '@/lib/arcana-db';
 import { cardNames, localizedPath, type SiteLocale } from '@/lib/site-i18n';
 import { serverLabels, serverRegions } from '@/lib/server-region';
@@ -51,7 +53,7 @@ export function ExchangeInsights({
             ? 'Current exchange activity'
             : '当前交换状态'}
       </h2>
-      <div className={`v2-service-totals${summary.open < 10 ? ' is-low-volume' : ''}`}>
+      {summary.open > 0 && <div className={`v2-service-totals${summary.open < 10 ? ' is-low-volume' : ''}`}>
         <span>
           <b>{summary.open}</b>
           {locale === 'ja'
@@ -76,7 +78,7 @@ export function ExchangeInsights({
               ? '最后更新'
               : ' last update'}
         </span>
-      </div>
+      </div>}
       {summary.open > 0 ? (
         <div className="v2-server-activity">
           <h3>
@@ -111,7 +113,7 @@ export function ExchangeInsights({
                 ? '选择想要和多余的圣牌，制作交换表后即可等待自动匹配。'
                 : 'Select missing cards and duplicates, create a trade list, and wait for automatic matches.'}
           </p>
-          <a href={`${localizedPath(locale)}#quick-create`}>
+          <a href={`${localizedPath(locale)}#inventory`}>
             {locale === 'ja'
               ? '30秒で交換募集を作る'
               : locale === 'zh-cn'
@@ -189,7 +191,7 @@ export function ExchangeInsights({
                   <span>{locale === 'en' ? 'Offered' : locale === 'ja' ? '譲' : '出'}</span>
                   {summarize(listing.offers)}
                 </p>
-                <a href={`/genshin-arcana/share/${listing.publicId}`}>
+                <a href={sharedTradeUrl({server:listing.server, inventory:inventoryFromQuickSelection(listing.wants,listing.offers)},locale,'shared_listing')}>
                   {locale === 'ja'
                     ? '自分のカードと比較'
                     : locale === 'zh-cn'

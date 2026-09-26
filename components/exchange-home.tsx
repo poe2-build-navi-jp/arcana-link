@@ -16,8 +16,10 @@ import {
 } from '@/components/icons';
 import { ExchangeTable } from '@/components/exchange-table';
 import { ExchangeInsights } from '@/components/exchange-insights';
+import { sharedTradeUrl, readSharedConditions, tradeShareText } from '@/lib/trade-sharing';
+import { inventoryStorageKeys, readStoredJson } from '@/lib/inventory-storage';
 import { track } from '@/lib/analytics';
-import { arcanaCards, cardBySlug, cardSlugById } from '@/lib/arcana-cards';
+import { arcanaCards, cardBySlug } from '@/lib/arcana-cards';
 import {
   collectedTypeCount,
   defaultInventory,
@@ -304,15 +306,14 @@ export function ExchangeHome({
   const [quickDuplicates, setQuickDuplicates] = useState<ArcanaId[]>([]);
   const [detailedEntry, setDetailedEntry] = useState(false);
   const [sharedDraft, setSharedDraft] = useState<SharedDraft | null>(null);
-  const [sharedDraftResult, setSharedDraftResult] = useState<
-    'exact' | 'different-server' | 'no-match' | null
-  >(null);
   const [previousVisit, setPreviousVisit] = useState('');
   const [revisitDismissed, setRevisitDismissed] = useState(false);
   const [lastSeenMatchIds, setLastSeenMatchIds] = useState<string[]>([]);
   const [lastPublishedAt, setLastPublishedAt] = useState('');
   const [currentTime, setCurrentTime] = useState(0);
   const [profileDirty, setProfileDirty] = useState(false);
+  const [savedVersion, setSavedVersion] = useState(0);
+  const comparedConditions = useRef('');
   const [refreshVersion, setRefreshVersion] = useState(0);
   const [intent, setIntent] = useState<{slug:string; action:string} | null>(null);
   const [publishSuccess, setPublishSuccess] = useState(false);
@@ -342,6 +343,11 @@ export function ExchangeHome({
     () => (sharedDraft ? offeredCards(sharedDraft.inventory) : []),
     [sharedDraft],
   );
+  const sharedDraftResult = useMemo(() => {
+    if (!sharedDraft || !profile.server || !reviewComplete) return null;
+    if (sharedDraft.server !== profile.server) return 'different-server';
+    return evaluateMatch({server:profile.server, inventory}, sharedDraft)?.exact ? 'exact' : 'no-match';
+  }, [sharedDraft, profile.server, reviewComplete, inventory]);
   const collected = useMemo(() => collectedTypeCount(inventory), [inventory]);
   const progress = Math.round((collected / arcanaCards.length) * 100);
   const duplicateCopies = useMemo(
@@ -365,7 +371,7 @@ export function ExchangeHome({
       .filter(
         (candidate) =>
           candidate.publicId !== profile.publicId &&
-          candidate.status !== 'closed',
+          candidate.status !== 'closed' && !candidate.sample,
       )
       .map((candidate): Match => {
         const result = evaluateMatch(currentUser, candidate);
@@ -410,13 +416,11 @@ export function ExchangeHome({
   useEffect(() => {
     document.documentElement.lang = localeInfo[locale].htmlLang;
     const savedInventory = normalizeInventory(
-      JSON.parse(localStorage.getItem(storageKeys.inventory) || 'null'),
+      readStoredJson(storageKeys.inventory),
     );
     if (savedInventory) setInventory(savedInventory);
-    const savedProfile = JSON.parse(
-      localStorage.getItem(storageKeys.profile) || 'null',
-    ) as (Omit<LocalProfile, 'server'> & { server?: unknown }) | null;
-    const savedReviewed = JSON.parse(localStorage.getItem(storageKeys.reviewed) || '[]') as unknown;
+    const savedProfile = readStoredJson(storageKeys.profile) as (Omit<LocalProfile, 'server'> & { server?: unknown }) | null;
+    const savedReviewed = readStoredJson(storageKeys.reviewed) ?? [];
     let savedReviewComplete = false;
     if (Array.isArray(savedReviewed)) {
       const valid = savedReviewed.filter((card): card is ArcanaId=>typeof card === 'string' && arcanaCards.some(item=>item.id===card));
@@ -429,9 +433,7 @@ export function ExchangeHome({
     }
     const lastVisit = localStorage.getItem(storageKeys.lastVisit) || '';
     setPreviousVisit(lastVisit);
-    const savedSeenMatches = JSON.parse(
-      localStorage.getItem(storageKeys.lastSeenMatchIds) || '[]',
-    ) as unknown;
+    const savedSeenMatches = readStoredJson(storageKeys.lastSeenMatchIds) as unknown;
     if (Array.isArray(savedSeenMatches)) {
       setLastSeenMatchIds(
         savedSeenMatches.filter((id): id is string => typeof id === 'string'),
@@ -448,23 +450,31 @@ export function ExchangeHome({
     );
     if (urlServer) setRequestedServer(urlServer);
     const params = new URL(window.location.href).searchParams;
-    sharedListingReferral.current =
-      params.get('utm_source') === 'shared_listing';
-    const wantSlugs = new Set((params.get('want') || '').split(',').filter(slug=>Object.hasOwn(cardBySlug,slug)));
-    const offerSlugs = new Set((params.get('offer') || '').split(',').filter(slug=>Object.hasOwn(cardBySlug,slug)));
-    if (params.has('want') || params.has('offer')) {
-      const sharedInventory = Object.fromEntries(
-        arcanaCards.map((card) => [
-          card.id,
-          wantSlugs.has(card.slug) ? 0 : offerSlugs.has(card.slug) ? 2 : 1,
-        ]),
-      ) as InventoryCounts;
-      if (params.get('shared') === '1' && urlServer) {
-        setSharedDraft({ server: urlServer, inventory: sharedInventory });
-        track('shared_listing_view', { server: urlServer });
-      } else {
-        setInventory(sharedInventory);
-        setReviewedCards(arcanaCards.map((card) => card.id));
+    const sharedConditions = readSharedConditions(params);
+    sharedListingReferral.current = Boolean(sharedConditions);
+    if (sharedConditions) {
+      setSharedDraft(sharedConditions);
+      track('shared_listing_view', {server:sharedConditions.server});
+      track('shared_url_visit', {server:sharedConditions.server});
+    }
+    // Retain old exchange-table handoff links only for an unfinished local draft.
+    if (!params.has('shared') && !savedReviewComplete && (params.has('want') || params.has('offer'))) {
+      const legacyParams = new URLSearchParams(params);
+      legacyParams.set('shared', '1');
+      if (!legacyParams.has('want')) legacyParams.set('want', '');
+      if (!legacyParams.has('offer')) legacyParams.set('offer', '');
+      const legacy = readSharedConditions(legacyParams);
+      if (legacy) {setInventory(legacy.inventory);setReviewedCards(arcanaCards.map(card=>card.id));}
+    }
+    // Shared conditions belong to the sender; never overwrite the receiver's cards.
+    if (!savedReviewComplete) {
+      const draft = readStoredJson(inventoryStorageKeys.quickDraft) as {step?:unknown; missing?:unknown; duplicates?:unknown} | null;
+      const validCards = (value: unknown) => Array.isArray(value) ? [...new Set(value.filter((id): id is ArcanaId => arcanaCards.some(card => card.id === id)))] : [];
+      if (draft) {
+        const wanted = validCards(draft.missing);
+        setQuickMissing(wanted);
+        setQuickDuplicates(validCards(draft.duplicates).filter(id => !wanted.includes(id)));
+        if (savedServer && (draft.step === 2 || draft.step === 3)) setQuickStep(draft.step);
       }
     }
     const requestedCard = params.get('card');
@@ -509,6 +519,20 @@ export function ExchangeHome({
   }, [hydrated, inventory, notifications, profile, reviewedCards]);
 
   useEffect(() => {
+    if (!hydrated) return;
+    if (reviewComplete) localStorage.removeItem(inventoryStorageKeys.quickDraft);
+    else localStorage.setItem(inventoryStorageKeys.quickDraft, JSON.stringify({step:quickStep, missing:quickMissing, duplicates:quickDuplicates}));
+  }, [hydrated, reviewComplete, quickStep, quickMissing, quickDuplicates]);
+
+  useEffect(() => {
+    if (!sharedDraftResult || !sharedDraft) return;
+    const key = JSON.stringify([profile.server, inventory, sharedDraft]);
+    if (comparedConditions.current === key) return;
+    comparedConditions.current = key;
+    track('shared_compare_complete', {server:profile.server, count:sharedDraftResult === 'exact' ? 1 : 0});
+  }, [sharedDraftResult, sharedDraft, inventory, profile.server]);
+
+  useEffect(() => {
     let stopped = false;
     const refreshSummary = async () => {
       try {
@@ -523,7 +547,7 @@ export function ExchangeHome({
     void refreshSummary();
     const interval = window.setInterval(refreshSummary, 300_000);
     return () => { stopped = true; window.clearInterval(interval); };
-  }, []);
+  }, [savedVersion]);
 
   /* oxlint-disable react/react-compiler -- Reset loading state when the selected server changes. */
   useEffect(() => {
@@ -566,7 +590,7 @@ export function ExchangeHome({
       stopped = true;
       window.clearInterval(interval);
     };
-  }, [locale, profile.server]);
+  }, [locale, profile.server, savedVersion]);
   /* oxlint-enable react/react-compiler */
 
   useEffect(() => {
@@ -593,7 +617,9 @@ export function ExchangeHome({
           mode?: 'local' | 'shared';
           updatedAt?: string;
         };
+        if (data.mode !== 'shared' || !data.publicId || !data.updatedAt) throw new Error('save_failed');
         if (data.mode === 'shared') {
+          setSavedVersion(current => current + 1);
           setShareMode('shared');
           setSaving(false);
           setToast(refreshRequested.current ? locale === 'ja' ? '募集を更新しました ✓ あと7日間、マッチ候補に表示されます。' : locale === 'en' ? 'Listing refreshed ✓ It will remain active for 7 days.' : '招募已更新 ✓ 接下来7天会显示在匹配候选中。' : copy.saved);
@@ -607,8 +633,10 @@ export function ExchangeHome({
           if (!completeTracked.current) {track('register_complete', {server:profile.server}); completeTracked.current = true;}
           if (publishRequested.current) {
             track('listing_publish_success', { server: profile.server });
+            track('match_wait_saved', {server:profile.server});
             if (sharedListingReferral.current) {
               track('shared_listing_new_listing', { server: profile.server });
+              track('shared_user_registered', {server:profile.server});
             }
             publishRequested.current = false;
             setPublishSuccess(true);
@@ -623,7 +651,7 @@ export function ExchangeHome({
         publishRequested.current = false;
         setSaving(false);
         setShareMode('local');
-        setToast(locale === 'ja' ? '公開保存に失敗しました。通信状態を確認してプロフィールを保存し直してください。' : 'Could not publish. Please retry saving your profile.');
+        setToast(locale === 'ja' ? '公開保存に失敗しました。通信状態を確認してプロフィールを保存し直してください。' : locale === 'zh-cn' ? '发布失败，请重新保存个人资料。' : 'Could not publish. Please retry saving your profile.');
       }
     }, 700);
     return () => window.clearTimeout(timer);
@@ -636,7 +664,7 @@ export function ExchangeHome({
       revisitTracked.current = true;
     }
     const liveIds = matches.filter(m=>m.exact && !m.profile.sample).map(m=>m.profile.publicId).sort().join(',');
-    if (liveIds && liveIds !== matchTracked.current) track('match_found', {count:matches.filter(m=>m.exact && !m.profile.sample).length});
+    if (liveIds && liveIds !== matchTracked.current) {track('match_found', {count:exactCount});track('perfect_match', {count:exactCount});}
     matchTracked.current = liveIds;
     const exactIds = new Set(
       matches
@@ -660,7 +688,7 @@ export function ExchangeHome({
       );
     }
     knownMatches.current = exactIds;
-  }, [locale, matches, newMatchCount, notifications]);
+  }, [exactCount, locale, matches, newMatchCount, notifications]);
 
   useEffect(() => {
     if (
@@ -690,10 +718,13 @@ export function ExchangeHome({
     startRegistration();
     if (!quickTracked.current) {
       track('quick_create_start');
+      track('quick_start');
       quickTracked.current = true;
     }
+    if (sharedDraft) track('shared_compare_start', {server:sharedDraft.server});
+    if (reviewComplete) {setDetailedEntry(true);return;}
     setDetailedEntry(false);
-    setQuickStep(profile.server ? 2 : 1);
+    setQuickStep(profile.server ? Math.max(2, quickStep) as 2 | 3 : 1);
   }
 
   function selectQuickServer(server: ServerRegion) {
@@ -746,23 +777,13 @@ export function ExchangeHome({
       inputCompleteTracked.current = true;
     }
     track('quick_create_complete', { server: profile.server });
+    track('quick_complete', {server:profile.server});
+    track('trade_list_created', {server:profile.server});
     track('exchange_table_create', { server: profile.server });
-    if (sharedDraft) {
-      if (sharedDraft.server !== profile.server) {
-        setSharedDraftResult('different-server');
-      } else {
-        const result = evaluateMatch(
-          { server: profile.server, inventory: nextInventory },
-          { server: sharedDraft.server, inventory: sharedDraft.inventory },
-        );
-        setSharedDraftResult(result?.exact ? 'exact' : 'no-match');
-        if (result?.exact) track('match_found', { server: profile.server, count: 1 });
-      }
-      window.location.hash = 'shared-condition';
-    } else {
-      setShareOpen(true);
-    }
+    if (sharedDraft) window.location.hash = 'shared-condition';
+    else setShareOpen(true);
   }
+
   function setCount(card: ArcanaId, count: CardCount) {
     startRegistration();
     if (!profile.server) { setServerOpen(true); return; }
@@ -782,8 +803,9 @@ export function ExchangeHome({
   function refreshListing() {
     if (!reviewComplete || !profile.publicId) return;
     refreshRequested.current = true;
+    setProfile(current => ({...current, status:'open'}));
     setSaving(true);
-    setToast(locale === 'ja' ? '募集を更新しています…' : 'Refreshing listing…');
+    setToast(locale === 'ja' ? '募集を更新しています…' : locale === 'zh-cn' ? '正在更新招募…' : 'Refreshing listing…');
     track('listing_refresh', {server:profile.server});
     setProfileDirty(true);
     setRefreshVersion(current=>current+1);
@@ -825,7 +847,7 @@ export function ExchangeHome({
     setProfileDirty(true);
     setProfileOpen(false);
     setSaving(true);
-    setToast(locale === 'ja' ? '公開募集を保存しています…' : 'Saving your listing…');
+    setToast(locale === 'ja' ? '公開募集を保存しています…' : locale === 'zh-cn' ? '正在保存招募…' : 'Saving your listing…');
   }
 
   async function reportMatch() {
@@ -866,6 +888,8 @@ export function ExchangeHome({
   }
 
   function publishCurrentListing() {
+    setShareOpen(false);
+    if (!reviewComplete) {window.location.assign('#inventory');return;}
     if (!profile.server) {
       setServerOpen(true);
       return;
@@ -879,7 +903,7 @@ export function ExchangeHome({
       publishRequested.current = true;
       track('listing_publish', { server: profile.server });
       setSaving(true);
-      setToast(locale === 'ja' ? '公開募集を保存しています…' : 'Saving your listing…');
+      setToast(locale === 'ja' ? '公開募集を保存しています…' : locale === 'zh-cn' ? '正在保存招募…' : 'Saving your listing…');
       setProfile((current) => ({ ...current, status: 'open' }));
       setProfileDirty(true);
       setRefreshVersion((current) => current + 1);
@@ -936,7 +960,7 @@ export function ExchangeHome({
 
   function changeLanguage(nextLocale: SiteLocale) {
     if (nextLocale === locale) return;
-    window.location.href = localizedPath(nextLocale);
+    window.location.href = sharedDraft ? sharedTradeUrl(sharedDraft, nextLocale, 'shared_listing') : localizedPath(nextLocale);
   }
 
   function completeTrade(match: Match) {
@@ -972,28 +996,11 @@ export function ExchangeHome({
   }
 
   function listingShareUrl(source = 'copy') {
-    const medium = source === 'x' ? 'social' : 'referral';
-    if (profile.publicId) {
-      return `https://arcana-card-link.pages.dev/genshin-arcana/share/${profile.publicId}?utm_source=${source}&utm_medium=${medium}&utm_campaign=exchange`;
-    }
-    const params = new URLSearchParams({shared:'1',server:profile.server||'asia',want:missing.map(card=>cardSlugById[card]).join(','),offer:duplicates.map(card=>cardSlugById[card]).join(','),utm_source:source,utm_medium:medium,utm_campaign:'exchange'});
-    return `https://arcana-card-link.pages.dev/?${params.toString()}#matches`;
+    return profile.server ? sharedTradeUrl({server:profile.server, inventory}, locale, source) : '';
   }
 
   function shareText(source = 'x') {
-    const url = listingShareUrl(source);
-    const list = (cards: ArcanaId[], none: string) => {
-      if (!cards.length) return none;
-      if (source !== 'x' || cards.length <= 4)
-        return cards.map((card) => labels[card]).join(' / ');
-      return `${cards
-        .slice(0, 3)
-        .map((card) => labels[card])
-        .join(' / ')}${locale === 'en' ? ` +${cards.length - 3} more` : ` ほか${cards.length - 3}種`}`;
-    };
-    if (locale === 'en') return ['Looking for Genshin Impact Lunar Arcana trades!','【Wanted】 '+list(missing,'None'),'【Offered】 '+list(duplicates,'None'),'Server: '+activeServerLabel,'Check compatible trades 👇',url,'#GenshinImpact #ArcanaTrade'].join('\n');
-    if (locale === 'zh-cn') return ['寻找原神月谕圣牌交换伙伴！','【求】'+list(missing,'无'),'【出】'+list(duplicates,'无'),'Server：'+activeServerLabel,'查看匹配条件👇',url,'#原神 #月谕圣牌'].join('\n');
-    return ['【原神 月諭のアルカナ交換】','求：'+list(missing,'なし'),'譲：'+list(duplicates,'なし'),'Server：'+activeServerLabel,'交換条件はこちら👇',url,'#原神 #月諭のアルカナ #アルカナ交換'].join('\n');
+    return profile.server ? tradeShareText({server:profile.server, inventory}, locale, source) : '';
   }
 
   async function collectionImage() {
@@ -1117,6 +1124,8 @@ export function ExchangeHome({
       link.click();
       URL.revokeObjectURL(url);
       setToast(shareCopy.saved);
+    } catch {
+      setToast(locale==='ja'?'画像を保存できませんでした。リンクや募集文のコピーをご利用ください。':locale==='en'?'Image export failed. Copy the link or listing text instead.':'图片保存失败，请复制链接或招募文案。');
     } finally {
       setShareBusy(false);
     }
@@ -1135,21 +1144,23 @@ export function ExchangeHome({
     if (typeof navigator.share !== 'function') return;
     try {
       await navigator.share({
-        title: 'ARCANA LINK 月諭アルカナ交換',
+        title: locale === 'ja' ? 'ARCANA LINK 月諭アルカナ交換' : locale === 'en' ? 'ARCANA LINK Lunar Arcana Trade' : 'ARCANA LINK 月谕圣牌交换',
         text: shareText('native'),
       });
       track('share_native', { server: profile.server });
     } catch (error) {
       if ((error as Error).name !== 'AbortError') {
-        setToast(locale === 'ja' ? '共有できませんでした。リンクコピーをお使いください。' : 'Could not share. Please copy the link.');
+        setToast(locale === 'ja' ? '共有できませんでした。リンクコピーをお使いください。' : locale === 'zh-cn' ? '分享失败，请复制链接。' : 'Could not share. Please copy the link.');
       }
     }
   }
 
   async function copyListingUrl() {
+    try {
     await navigator.clipboard.writeText(listingShareUrl('copy'));
     track('share_copy', {server:profile.server});
-    setToast(locale === 'ja' ? '共有リンクをコピーしました' : 'Share link copied');
+    setToast(locale === 'ja' ? '共有リンクをコピーしました' : locale === 'zh-cn' ? '已复制分享链接' : 'Share link copied');
+    } catch {setShareOpen(true);setToast(locale==='ja'?'共有URL欄を選択してコピーしてください。':locale==='en'?'Select the share URL to copy it.':'请选择分享链接并复制。');}
   }
 
   async function copyListingText() {
@@ -1167,7 +1178,7 @@ export function ExchangeHome({
       setToast(
         locale === 'ja'
           ? 'コピーできませんでした。共有リンクをご利用ください。'
-          : 'Copy failed. Please use the share link.',
+          : locale === 'zh-cn' ? '复制失败，请使用分享链接。' : 'Copy failed. Please use the share link.',
       );
     }
   }
@@ -1208,9 +1219,9 @@ export function ExchangeHome({
   }
 
   const zeroMatchActions = listingsLoaded && !listingError ? <div className="v2-empty v2-zero-match">
-    <Bell size={24}/><h3>{profile.publicId && profile.status !== 'closed' ? (locale==='ja'?'マッチ待ちに登録しました':locale==='en'?'Your listing is waiting for matches':'已进入匹配等待') : (locale==='ja'?'この条件でマッチ待ちできます':locale==='en'?'Save this listing and wait for matches':'可用此条件等待匹配')}</h3><p>{locale==='ja'?'今は条件が完全一致する相手がいません。募集を公開しておくと、新しい募集が追加された時にも同じサーバー内で自動比較されます。':locale==='en'?'There is no exact match right now. Publish your listing so future players on your server can be compared.':'目前没有条件完全一致的伙伴。发布招募后，可以与之后登记的同服务器玩家比较。'}</p>
-    <small>{locale==='ja'?'募集は7日間保存され、古い募集は自動的に候補から外れます。':'Listings remain active for 7 days.'}</small>
-    <div className="v2-empty-actions"><button className="v2-primary" onClick={publishCurrentListing} type="button">{profile.publicId && profile.status !== 'closed' ? (locale==='ja'?'募集を更新する':'Refresh listing') : (locale==='ja'?'この条件でマッチ待ちする':locale==='en'?'Publish and wait':'发布并等待')}</button><button className="v2-x-button" onClick={()=>void postToX()} type="button">𝕏 {locale==='ja'?'でも募集する':locale==='en'?'Share on X':'在X发布'}</button><button onClick={()=>void copyListingText()} type="button">{locale==='ja'?'募集文をコピー':locale==='en'?'Copy listing text':'复制招募文案'}</button><button onClick={openExchangeTable} type="button">{locale==='ja'?'交換表を共有する':locale==='en'?'Share exchange table':'分享交换表'}</button></div>
+    <Bell size={24}/><h3>{profile.publicId && profile.status !== 'closed' && !listingExpired && !profileDirty && lastPublishedAt ? (locale==='ja'?'マッチ待ちに登録しました':locale==='en'?'Your listing is waiting for matches':'已进入匹配等待') : (locale==='ja'?'この条件でマッチ待ちできます':locale==='en'?'Save this listing and wait for matches':'可用此条件等待匹配')}</h3><p>{locale==='ja'?'今は条件が完全一致する相手がいません。募集を公開しておくと、新しい募集が追加された時にも同じサーバー内で自動比較されます。':locale==='en'?'There is no exact match right now. Publish your listing so future players on your server can be compared.':'目前没有条件完全一致的伙伴。发布招募后，可以与之后登记的同服务器玩家比较。'}</p>
+    <small>{locale==='ja'?'募集は7日間保存され、古い募集は自動的に候補から外れます。':locale === 'zh-cn' ? '招募有效期为7天。' : 'Listings remain active for 7 days.'}</small>
+    <div className="v2-empty-actions"><button className="v2-primary" onClick={publishCurrentListing} type="button">{profile.publicId && profile.status !== 'closed' && !listingExpired && !profileDirty && lastPublishedAt ? (locale==='ja'?'募集を更新する':locale === 'zh-cn' ? '更新招募' : 'Refresh listing') : (locale==='ja'?'この条件でマッチ待ちする':locale==='en'?'Publish and wait':'发布并等待')}</button><button className="v2-x-button" onClick={()=>void postToX()} type="button">𝕏 {locale==='ja'?'でも募集する':locale==='en'?'Share on X':'在X发布'}</button><button onClick={()=>void copyListingText()} type="button">{locale==='ja'?'募集文をコピー':locale==='en'?'Copy listing text':'复制招募文案'}</button><button onClick={openExchangeTable} type="button">{locale==='ja'?'交換表を共有する':locale==='en'?'Share exchange table':'分享交换表'}</button></div>
   </div> : null;
 
   return (
@@ -1247,7 +1258,7 @@ export function ExchangeHome({
           {languageLinks.map((link) => (
             <a
               className={link.locale === locale ? 'current' : ''}
-              href={localizedPath(link.locale)}
+              href={sharedDraft ? sharedTradeUrl(sharedDraft, link.locale, 'shared_listing') : localizedPath(link.locale)}
               hrefLang={localeInfo[link.locale].hreflang}
               key={link.locale}
             >
@@ -1272,7 +1283,7 @@ export function ExchangeHome({
         </button>
       )}
 
-      {newMatchCount>0 && !revisitDismissed && <div className="v2-return-notice"><span>🎉 {locale==='ja'?`前回のアクセス後に${newMatchCount}件の新しい完全マッチがあります`:locale==='en'?`${newMatchCount} new exact match${newMatchCount>1?'es':''} since your last visit`:`上次访问后有${newMatchCount}个新的完全匹配`}</span><a href="#matches" onClick={markNewMatchesSeen}>{locale==='ja'?'マッチを見る':'View matches'}</a></div>}
+      {newMatchCount>0 && !revisitDismissed && <div className="v2-return-notice"><span>🎉 {locale==='ja'?`前回のアクセス後に${newMatchCount}件の新しい完全マッチがあります`:locale==='en'?`${newMatchCount} new exact match${newMatchCount>1?'es':''} since your last visit`:`上次访问后有${newMatchCount}个新的完全匹配`}</span><a href="#matches" onClick={markNewMatchesSeen}>{locale==='ja'?'マッチを見る':locale === 'zh-cn' ? '查看匹配' : 'View matches'}</a></div>}
 
       {requestedServer &&
         profile.server &&
@@ -1301,17 +1312,17 @@ export function ExchangeHome({
         <span className="v2-kicker">SHARED TRADE</span>
         <h2>{locale==='ja'?'この人の交換条件':locale==='en'?'Shared trade conditions':'对方的交换条件'}</h2>
         <p><b>Server：</b>{serverLabels[locale][sharedDraft.server]}</p>
-        <p><b>{locale==='ja'?'欲しい':'Wanted'}：</b>{sharedDraftMissing.map((card)=>labels[card]).join(' / ')||'—'}</p>
-        <p><b>{locale==='ja'?'出せる':'Offered'}：</b>{sharedDraftDuplicates.map((card)=>labels[card]).join(' / ')||'—'}</p>
-        {!sharedDraftResult ? <a className="card-seo-action" href="#quick-create" onClick={()=>{startQuickRegistration();track('shared_listing_compare_start',{server:sharedDraft.server});}}>{locale==='ja'?'あなたと交換できるか確認する':locale==='en'?'Check if you can trade':'确认能否交换'}</a> : sharedDraftResult === 'exact' ? <div className="v2-shared-result"><h3>🎉 {locale==='ja'?'完全マッチです':locale==='en'?'Exact match':'完全匹配'}</h3><p>{locale==='ja'?'お互いの求・譲が一致しています。自分の募集も公開すると、共有者や同条件の人に見つけてもらえます。':'Both wanted and offered cards match. Publish your listing so this player or another compatible player can find you.'}</p><button className="v2-primary" onClick={publishCurrentListing} type="button">{locale==='ja'?'この条件でマッチ待ちする':'Publish and wait'}</button></div> : <div className="v2-shared-result"><h3>{sharedDraftResult==='different-server'?(locale==='ja'?'サーバーが異なります':'Different server'):(locale==='ja'?'今回は完全一致ではありません':'Not an exact match')}</h3><p>{locale==='ja'?'あなたの条件でも別の交換相手を探せます。':'You can still find another player using your own conditions.'}</p><button className="v2-primary" onClick={publishCurrentListing} type="button">{locale==='ja'?'この条件でマッチ待ちする':'Publish and wait'}</button></div>}
-        <small>{locale==='ja'?'共有URLにUID・表示名・個人メモは含まれていません。':'UID, display name and private notes are not included in this URL.'}</small>
+        <p><b>{locale==='ja'?'欲しい':locale === 'zh-cn' ? '求' : 'Wanted'}：</b>{sharedDraftMissing.map((card)=>labels[card]).join(' / ')||'—'}</p>
+        <p><b>{locale==='ja'?'出せる':locale === 'zh-cn' ? '出' : 'Offered'}：</b>{sharedDraftDuplicates.map((card)=>labels[card]).join(' / ')||'—'}</p>
+        {!sharedDraftResult ? <a className="card-seo-action" href={reviewComplete ? "#inventory" : "#quick-create"} onClick={()=>{startQuickRegistration();track('shared_listing_compare_start',{server:sharedDraft.server});}}>{locale==='ja'?'あなたと交換できるか確認する':locale==='en'?'Check if you can trade':'确认能否交换'}</a> : sharedDraftResult === 'exact' ? <div className="v2-shared-result"><h3>🎉 {locale==='ja'?'完全マッチです':locale==='en'?'Exact match':'完全匹配'}</h3><p>{locale==='ja'?'お互いの求・譲が一致しています。自分の募集も公開すると、共有者や同条件の人に見つけてもらえます。':locale === 'zh-cn' ? '双方求与出条件一致。发布自己的招募，让这位玩家或其他匹配的玩家找到你。' : 'Both wanted and offered cards match. Publish your listing so this player or another compatible player can find you.'}</p><button className="v2-primary" onClick={publishCurrentListing} type="button">{locale==='ja'?'この条件でマッチ待ちする':locale === 'zh-cn' ? '发布并等待匹配' : 'Publish and wait'}</button></div> : <div className="v2-shared-result"><h3>{sharedDraftResult==='different-server'?(locale==='ja'?'サーバーが異なります':locale === 'zh-cn' ? '服务器不同' : 'Different server'):(locale==='ja'?'今回は完全一致ではありません':locale === 'zh-cn' ? '尚未完全匹配' : 'Not an exact match')}</h3><p>{locale==='ja'?'あなたの条件でも別の交換相手を探せます。':locale === 'zh-cn' ? '仍可使用自己的条件寻找其他交换伙伴。' : 'You can still find another player using your own conditions.'}</p><button className="v2-primary" onClick={publishCurrentListing} type="button">{locale==='ja'?'この条件でマッチ待ちする':locale === 'zh-cn' ? '发布并等待匹配' : 'Publish and wait'}</button></div>}
+        <small>{locale==='ja'?'共有URLにUID・表示名・個人メモは含まれていません。':locale === 'zh-cn' ? '此链接不包含UID、昵称或个人备注。' : 'UID, display name and private notes are not included in this URL.'}</small>
       </section>}
 
       <section className="quality-intro">
         <h2>{summary?.open === 0 ? (locale==='ja'?'月諭のアルカナ交換表を30秒で作成':locale==='en'?'Create your Lunar Arcana trade list in 30 seconds':'30秒制作月谕圣牌交换表') : (locale==='ja'?'掲示板を1件ずつ探す必要はありません':locale==='en'?'Skip searching listings one by one':'无需逐条查找交换帖')}</h2>
-        {summary?.open === 0 && <p>{locale==='ja'?'交換相手がまだいなくても交換表を作成でき、そのまま同じ条件でマッチ待ちできます。':'Create a useful trade list now, then keep the same conditions active for automatic matching.'}</p>}
+        {summary?.open === 0 && <p>{locale==='ja'?'交換相手がまだいなくても交換表を作成でき、そのまま同じ条件でマッチ待ちできます。':locale === 'zh-cn' ? '先制作交换表，再发布相同条件的招募以等待自动匹配。' : 'Create a useful trade list now, then keep the same conditions active for automatic matching.'}</p>}
         <ul><li>{locale==='ja'?'お互いの「求・譲」を自動比較':locale==='en'?'Compare both wanted and offered cards':'自动比较双方求与出'}</li><li>{locale==='ja'?'同じサーバーだけ表示':locale==='en'?'Show players on your server only':'仅显示同服务器玩家'}</li><li>{locale==='ja'?'条件一致した相手を優先表示':locale==='en'?'Prioritize two-way matches':'优先显示双向匹配'}</li><li>{locale==='ja'?'7日以上更新のない募集は除外':locale==='en'?'Exclude listings inactive for 7 days':'排除7天未更新招募'}</li></ul>
-        <nav><a className="card-seo-action" href="#quick-create" onClick={startQuickRegistration}>{locale==='ja'?'30秒で交換募集を作る':locale==='en'?'Create my trade list':'制作交换表'}</a><a href={localizedPath(locale,'guide')}>{locale==='ja'?'使い方を見る':'How it works'}</a></nav>
+        <nav><a className="card-seo-action" href={reviewComplete ? "#inventory" : "#quick-create"} onClick={startQuickRegistration}>{locale==='ja'?'30秒で交換募集を作る':locale==='en'?'Create my trade list':'制作交换表'}</a><a href={localizedPath(locale,'guide')}>{locale==='ja'?'使い方を見る':locale === 'zh-cn' ? '使用方法' : 'How it works'}</a></nav>
       </section>
       {summary && <ExchangeInsights locale={locale} now={currentTime} summary={summary} />}
       <section className="v2-overview" aria-labelledby="collection-heading">
@@ -1324,13 +1335,13 @@ export function ExchangeHome({
             </div>
             <strong>{reviewComplete?`${progress}%`:`${reviewedCount}/22`}</strong>
           </div>
-          {!profile.publicId && reviewedCount === 0 && <div className="seo-empty"><p>{locale === 'ja' ? '未所持と余っているカードを選ぶだけ。選ばなかったカードは1枚として扱います。' : locale === 'en' ? 'Select missing cards and duplicates. Unselected cards count as one copy.' : '只需选择未持有和重复的圣牌，未选择的按1张处理。'}</p><a href="#quick-create" onClick={startQuickRegistration}>{locale === 'ja' ? '30秒で交換募集を作る' : locale === 'en' ? 'Create my trade list' : '制作交换表'}</a></div>}
+          {!profile.publicId && reviewedCount === 0 && <div className="seo-empty"><p>{locale === 'ja' ? '未所持と余っているカードを選ぶだけ。選ばなかったカードは1枚として扱います。' : locale === 'en' ? 'Select missing cards and duplicates. Unselected cards count as one copy.' : '只需选择未持有和重复的圣牌，未选择的按1张处理。'}</p><a href={reviewComplete ? "#inventory" : "#quick-create"} onClick={startQuickRegistration}>{locale === 'ja' ? '30秒で交換募集を作る' : locale === 'en' ? 'Create my trade list' : '制作交换表'}</a></div>}
           <div className="v2-progress-track" aria-label={`${reviewComplete?progress:Math.round(reviewedCount/22*100)}%`}>
             <i style={{ width: `${reviewComplete?progress:Math.round(reviewedCount/22*100)}%` }} />
           </div>
           <div className="v2-progress-meta">
-            <b>{reviewComplete?collected:reviewedCount} / 22 <span>{reviewComplete?copy.owned:(locale==='ja'?'入力済み':'reviewed')}</span></b>
-            <span>{reviewComplete?(missing.length?copy.remaining.replace('{count}',String(missing.length)):copy.complete):(locale==='ja'?`あと${22-reviewedCount}種類を確認`:`${22-reviewedCount} to review`)}</span>
+            <b>{reviewComplete?collected:reviewedCount} / 22 <span>{reviewComplete?copy.owned:(locale==='ja'?'入力済み':locale === 'zh-cn' ? '已确认' : 'reviewed')}</span></b>
+            <span>{reviewComplete?(missing.length?copy.remaining.replace('{count}',String(missing.length)):copy.complete):(locale==='ja'?`あと${22-reviewedCount}種類を確認`:locale==='zh-cn'?`还需确认${22-reviewedCount}种`:`${22-reviewedCount} to review`)}</span>
           </div>
           {reviewedCount>0 && <div className="v2-summary-columns">
             <div>
@@ -1369,7 +1380,7 @@ export function ExchangeHome({
               <b>{locale === 'ja' ? '交換表を作る' : shareCopy.open}</b>
             </span>
             <small>
-              {reviewComplete?`${collected}/22 · ${progress}%`:`${reviewedCount}/22 入力`} →
+              {reviewComplete?`${collected}/22 · ${progress}%`:`${reviewedCount}/22`} →
             </small>
           </button>
         </div>
@@ -1428,36 +1439,36 @@ export function ExchangeHome({
         <header className="v2-section-heading">
           <div>
             <span className="v2-kicker">01 · INVENTORY</span>
-            <h2>{copy.inventory}<small>{reviewComplete?(locale==='ja'?'22 / 22 入力完了 ✓':'22 / 22 complete'):`${reviewedCount} / 22 ${locale==='ja'?'入力済み':'reviewed'}`}</small></h2>
+            <h2>{copy.inventory}<small>{reviewComplete?(locale==='ja'?'22 / 22 入力完了 ✓':locale==='zh-cn'?'22 / 22 已确认':'22 / 22 complete'):`${reviewedCount} / 22 ${locale==='ja'?'入力済み':locale === 'zh-cn' ? '已确认' : 'reviewed'}`}</small></h2>
           </div>
           <p>{copy.inventoryHint}</p>
         </header>
         {!reviewComplete && !detailedEntry && <div className="v2-quick-create" id="quick-create">
           <div className="v2-quick-head">
             <div><span className="v2-kicker">30-SECOND SETUP</span><h3>{locale==='ja'?'かんたん登録':locale==='en'?'Quick setup':'快速登记'}</h3></div>
-            <ol aria-label={locale==='ja'?'入力手順':'Setup steps'}><li className={quickStep===1?'active':''}>1 {locale==='ja'?'サーバー':'Server'}</li><li className={quickStep===2?'active':''}>2 {locale==='ja'?'未所持':'Missing'}</li><li className={quickStep===3?'active':''}>3 {locale==='ja'?'重複':'Duplicates'}</li></ol>
+            <ol aria-label={locale==='ja'?'入力手順':locale === 'zh-cn' ? '登记步骤' : 'Setup steps'}><li className={quickStep===1?'active':''}>1 {locale==='ja'?'サーバー':locale === 'zh-cn' ? '服务器' : 'Server'}</li><li className={quickStep===2?'active':''}>2 {locale==='ja'?'未所持':locale === 'zh-cn' ? '未持有' : 'Missing'}</li><li className={quickStep===3?'active':''}>3 {locale==='ja'?'重複':locale === 'zh-cn' ? '重复' : 'Duplicates'}</li></ol>
           </div>
           {quickStep === 1 && <div className="v2-quick-step">
             <h4>{locale==='ja'?'サーバーを選択':locale==='en'?'Choose your server':'选择服务器'}</h4>
-            <p>{locale==='ja'?'同じサーバーの交換相手だけを比較します。':'Only players on the same server can be matched.'}</p>
+            <p>{locale==='ja'?'同じサーバーの交換相手だけを比較します。':locale === 'zh-cn' ? '仅匹配同一服务器的玩家。' : 'Only players on the same server can be matched.'}</p>
             <div className="v2-quick-servers">{serverRegions.map((server)=><button key={server} onClick={()=>selectQuickServer(server)} type="button">🌏 <b>{serverLabels.en[server]}</b></button>)}</div>
           </div>}
           {quickStep === 2 && <div className="v2-quick-step">
             <h4>{locale==='ja'?'持っていないアルカナを選んでください':locale==='en'?'Select cards you are missing':'选择未持有的圣牌'}</h4>
-            <p>{locale==='ja'?'選ばなかったカードは「1枚持っている」として扱います。':'Unselected cards will count as one copy.'}</p>
+            <p>{locale==='ja'?'選ばなかったカードは「1枚持っている」として扱います。':locale === 'zh-cn' ? '未选择的圣牌按持有1张处理。' : 'Unselected cards will count as one copy.'}</p>
             <div className="v2-quick-cards">{arcanaCards.map((card,index)=><button aria-pressed={quickMissing.includes(card.id)} key={card.id} onClick={()=>toggleQuickCard('missing',card.id)} type="button"><span>{romans[index]}</span><i>{card.symbol}</i><b>{labels[card.id]}</b></button>)}</div>
-            <div className="v2-quick-actions"><button className="v2-primary" onClick={()=>setQuickStep(3)} type="button">{locale==='ja'?'次へ：余っているカード':'Next: duplicates'} →</button></div>
+            <div className="v2-quick-actions"><button className="v2-primary" onClick={()=>setQuickStep(3)} type="button">{locale==='ja'?'次へ：余っているカード':locale === 'zh-cn' ? '下一步：重复圣牌' : 'Next: duplicates'} →</button></div>
           </div>}
           {quickStep === 3 && <div className="v2-quick-step">
             <h4>{locale==='ja'?'2枚以上持っているアルカナを選んでください':locale==='en'?'Select cards you have at least twice':'选择持有2张以上的圣牌'}</h4>
-            <p>{locale==='ja'?'選んだカードは交換に出せるカードとして扱います。3枚以上は完成後に詳細編集できます。':'Selected cards will be offered for trade. Edit exact counts after setup if needed.'}</p>
+            <p>{locale==='ja'?'選んだカードは交換に出せるカードとして扱います。3枚以上は完成後に詳細編集できます。':locale === 'zh-cn' ? '选中的圣牌可用于交换。完成后可以修改准确数量。' : 'Selected cards will be offered for trade. Edit exact counts after setup if needed.'}</p>
             <div className="v2-quick-cards offer">{arcanaCards.map((card,index)=><button aria-pressed={quickDuplicates.includes(card.id)} key={card.id} onClick={()=>toggleQuickCard('duplicate',card.id)} type="button"><span>{romans[index]}</span><i>{card.symbol}</i><b>{labels[card.id]}</b></button>)}</div>
-            <div className="v2-quick-actions"><button onClick={()=>setQuickStep(2)} type="button">← {locale==='ja'?'戻る':'Back'}</button><button className="v2-primary" onClick={completeQuickRegistration} type="button">{locale==='ja'?'交換表を作る':'Create trade list'}</button></div>
+            <div className="v2-quick-actions"><button onClick={()=>setQuickStep(2)} type="button">← {locale==='ja'?'戻る':locale === 'zh-cn' ? '返回' : 'Back'}</button><button className="v2-primary" onClick={completeQuickRegistration} type="button">{locale==='ja'?'交換表を作る':locale === 'zh-cn' ? '制作交换表' : 'Create trade list'}</button></div>
           </div>}
-          <button className="v2-detail-toggle" onClick={()=>setDetailedEntry(true)} type="button">{locale==='ja'?'所持数を細かく編集（0 / 1 / 2 / 3+）':'Edit exact counts (0 / 1 / 2 / 3+)'}</button>
-          <p className="v2-quick-privacy">{locale==='ja'?'ログイン不要。交換表や共有文にUIDは入りません。':'No login required. Your UID is not included in trade lists or share text.'}</p>
+          <button className="v2-detail-toggle" onClick={()=>setDetailedEntry(true)} type="button">{locale==='ja'?'所持数を細かく編集（0 / 1 / 2 / 3+）':locale === 'zh-cn' ? '编辑准确数量（0 / 1 / 2 / 3+）' : 'Edit exact counts (0 / 1 / 2 / 3+)'}</button>
+          <p className="v2-quick-privacy">{locale==='ja'?'ログイン不要。交換表や共有文にUIDは入りません。':locale === 'zh-cn' ? '无需登录。交换表和分享文案不包含UID。' : 'No login required. Your UID is not included in trade lists or share text.'}</p>
         </div>}
-        {reviewComplete && <button className="v2-detail-toggle" onClick={()=>setDetailedEntry((current)=>!current)} type="button">{detailedEntry ? (locale==='ja'?'詳細編集を閉じる':'Close exact counts') : (locale==='ja'?'所持数を細かく編集':'Edit exact counts')}</button>}
+        {reviewComplete && <button className="v2-detail-toggle" onClick={()=>setDetailedEntry((current)=>!current)} type="button">{detailedEntry ? (locale==='ja'?'詳細編集を閉じる':locale === 'zh-cn' ? '关闭详细编辑' : 'Close exact counts') : (locale==='ja'?'所持数を細かく編集':locale === 'zh-cn' ? '编辑准确数量' : 'Edit exact counts')}</button>}
         {detailedEntry && !profile.server && (
           <button className="v2-server-lock" onClick={() => setServerOpen(true)} type="button"><span aria-hidden="true">🌏</span><b>{serverCopy.locked}</b><small>{serverCopy.chooseAction} →</small></button>
         )}
@@ -1475,7 +1486,7 @@ export function ExchangeHome({
                   <i>{card.symbol}</i>
                   <strong>{labels[card.id]}</strong>
                 </div>
-                <div className="v2-count-options" aria-label={`${labels[card.id]} ${reviewed?countLabel(locale,count):locale==='ja'?'未入力':'Not entered'}`}>
+                <div className="v2-count-options" aria-label={`${labels[card.id]} ${reviewed?countLabel(locale,count):locale==='ja'?'未入力':locale === 'zh-cn' ? '未输入' : 'Not entered'}`}>
                   {([0,1,2,3] as CardCount[]).map(value=><button aria-pressed={reviewed&&count===value} disabled={!profile.server} key={value} onClick={()=>setCount(card.id,value)} type="button">{value===3?'3+':value}</button>)}
                 </div>
                 <small>{reviewed?countLabel(locale,count):(locale==='ja'?'未入力':locale==='en'?'Not entered':'未输入')}</small>
@@ -1483,7 +1494,7 @@ export function ExchangeHome({
             );
           })}
         </div>}
-        {reviewComplete && <div className="v2-ready-panel"><div><span className="v2-kicker">READY</span><h3>{locale==='ja'?'交換準備ができました ✓':locale==='en'?'Ready to trade ✓':'交换准备完成 ✓'}</h3><p><b>Server：</b>{activeServerLabel}</p><p><b>{locale==='ja'?'求':'Wanted'}：</b>{missing.map(card=>labels[card]).join(' / ')||'—'}</p><p><b>{locale==='ja'?'譲':'Offered'}：</b>{duplicates.map(card=>labels[card]).join(' / ')||'—'}</p></div><nav><a className="v2-primary" href="#matches" onClick={()=>track('match_search',{server:profile.server})}>{locale==='ja'?'条件が合う相手を探す':'Find compatible players'}</a><button className="v2-primary v2-publish-primary" onClick={publishCurrentListing} type="button">{locale==='ja'?'この内容で募集を公開する':locale==='en'?'Publish this listing':'发布此招募'}</button><button className="v2-x-button" onClick={()=>void postToX()} type="button">𝕏 {locale==='ja'?'で交換募集する':'Share on X'}</button><button onClick={openExchangeTable} type="button">{locale==='ja'?'交換表を保存する':'Save exchange table'}</button></nav></div>}
+        {reviewComplete && <div className="v2-ready-panel"><div><span className="v2-kicker">READY</span><h3>{locale==='ja'?'交換準備ができました ✓':locale==='en'?'Ready to trade ✓':'交换准备完成 ✓'}</h3><p><b>Server：</b>{activeServerLabel}</p><p><b>{locale==='ja'?'求':locale === 'zh-cn' ? '求' : 'Wanted'}：</b>{missing.map(card=>labels[card]).join(' / ')||'—'}</p><p><b>{locale==='ja'?'譲':locale === 'zh-cn' ? '出' : 'Offered'}：</b>{duplicates.map(card=>labels[card]).join(' / ')||'—'}</p></div><nav><a className="v2-primary" href="#matches" onClick={()=>track('match_search',{server:profile.server})}>{locale==='ja'?'条件が合う相手を探す':locale === 'zh-cn' ? '寻找匹配伙伴' : 'Find compatible players'}</a><button className="v2-primary v2-publish-primary" onClick={publishCurrentListing} type="button">{locale==='ja'?'この内容で募集を公開する':locale==='en'?'Publish this listing':'发布此招募'}</button><button className="v2-x-button" onClick={()=>void postToX()} type="button">𝕏 {locale==='ja'?'で交換募集する':locale === 'zh-cn' ? '在X分享' : 'Share on X'}</button><button onClick={openExchangeTable} type="button">{locale==='ja'?'交換表を保存する':locale === 'zh-cn' ? '保存交换表' : 'Save exchange table'}</button></nav></div>}
       </section>
 
       <section className="v2-match-section" id="matches">
@@ -1520,7 +1531,7 @@ export function ExchangeHome({
           </div>
         )}
         {!reviewComplete ? (
-          <div className="v2-empty"><p>{locale==='ja'?`残り${22-reviewedCount}種類を確認すると、実際の条件でマッチングを開始します。`:'Review all 22 cards to start matching with accurate conditions.'}</p><a className="card-seo-action" href="#inventory">{locale==='ja'?'カード入力を続ける':'Continue card entry'}</a></div>
+          <div className="v2-empty"><p>{locale==='ja'?`残り${22-reviewedCount}種類を確認すると、実際の条件でマッチングを開始します。`:locale === 'zh-cn' ? '确认全部22种圣牌后，即可按实际条件进行匹配。' : 'Review all 22 cards to start matching with accurate conditions.'}</p><a className="card-seo-action" href="#inventory">{locale==='ja'?'カード入力を続ける':locale === 'zh-cn' ? '继续登记圣牌' : 'Continue card entry'}</a></div>
         ) : !profile.server ? (
           <div className="v2-empty v2-server-empty">
             <span aria-hidden="true">🌏</span>
@@ -1582,7 +1593,7 @@ export function ExchangeHome({
             ))}
           </div>{exactCount===0 && zeroMatchActions}</>
         ) : (
-          listingError ? <div className="v2-empty"><p role="alert">{locale==='ja'?'募集を取得できませんでした。実際の募集状況は確認できていません。しばらくしてからページを再読み込みしてください。':'Listings are unavailable. Please reload later.'}</p></div> : zeroMatchActions
+          listingError ? <div className="v2-empty"><p role="alert">{locale==='ja'?'募集を取得できませんでした。実際の募集状況は確認できていません。しばらくしてからページを再読み込みしてください。':locale === 'zh-cn' ? '暂时无法获取招募，请稍后刷新。' : 'Listings are unavailable. Please reload later.'}</p></div> : zeroMatchActions
         )}
       </section>
 
@@ -1832,7 +1843,7 @@ export function ExchangeHome({
             <header className="dialog-head">
               <div>
                 <span className="v2-kicker">{shareCopy.kicker}</span>
-                <h2 id="share-title">{publishSuccess && locale==='ja'?'募集を公開しました ✓':shareCopy.title}</h2>
+                <h2 id="share-title">{publishSuccess ? (locale==='ja'?'募集を公開しました ✓':locale==='en'?'Listing published ✓':'招募已发布 ✓') : shareCopy.title}</h2>
               </div>
               <button
                 className="dialog-close"
@@ -1844,9 +1855,9 @@ export function ExchangeHome({
               </button>
             </header>
             <div className="v2-share-body">
-              {publishSuccess && <div className="v2-publish-success"><p><b>Server：</b>{activeServerLabel}</p><p><b>{locale==='ja'?'求':'Wanted'}：</b>{missing.map(card=>labels[card]).join(' / ')||'—'}</p><p><b>{locale==='ja'?'譲':'Offered'}：</b>{duplicates.map(card=>labels[card]).join(' / ')||'—'}</p><p>{locale==='ja'?'この募集を共有すると、交換相手に見つけてもらいやすくなります。':'Share this listing so compatible players can find it.'}</p></div>}
+              {publishSuccess && <div className="v2-publish-success"><p><b>Server：</b>{activeServerLabel}</p><p><b>{locale==='ja'?'求':locale === 'zh-cn' ? '求' : 'Wanted'}：</b>{missing.map(card=>labels[card]).join(' / ')||'—'}</p><p><b>{locale==='ja'?'譲':locale === 'zh-cn' ? '出' : 'Offered'}：</b>{duplicates.map(card=>labels[card]).join(' / ')||'—'}</p><p>{locale==='ja'?'この募集を共有すると、交換相手に見つけてもらいやすくなります。':locale === 'zh-cn' ? '分享此招募，让条件相符的玩家找到你。' : 'Share this listing so compatible players can find it.'}</p></div>}
               <ExchangeTable inventory={inventory} server={profile.server} status={profile.status} publicId={(saving ? undefined : profile.publicId)} locale={locale} />
-              {!profile.publicId && <div className="v2-match-wait-cta"><b>{locale==='ja'?'交換表が完成しました ✓':locale==='en'?'Your trade list is ready ✓':'交换表已完成 ✓'}</b><p>{locale==='ja'?'同じ条件を7日間保存し、新しい募集とも自動比較できます。UID入力は次の画面で行い、共有文や画像には載せません。':'Save these conditions for 7 days and compare them with future listings. Your UID is never included in share text or images.'}</p><button className="v2-primary" onClick={publishCurrentListing} type="button">{locale==='ja'?'この条件でマッチ待ちする':locale==='en'?'Save and wait for matches':'保存并等待匹配'}</button></div>}
+              {!profile.publicId && <div className="v2-match-wait-cta"><b>{locale==='ja'?'交換表が完成しました ✓':locale==='en'?'Your trade list is ready ✓':'交换表已完成 ✓'}</b><p>{locale==='ja'?'同じ条件を7日間保存し、新しい募集とも自動比較できます。UID入力は次の画面で行い、共有文や画像には載せません。':locale === 'zh-cn' ? '保存条件7天，与之后的招募自动比较。下一步填写UID，但分享文案和图片不会包含UID。' : 'Save these conditions for 7 days and compare them with future listings. Your UID is never included in share text or images.'}</p><button className="v2-primary" onClick={publishCurrentListing} type="button">{locale==='ja'?'この条件でマッチ待ちする':locale==='en'?'Save and wait for matches':'保存并等待匹配'}</button></div>}
               <div className="v2-share-preview">
                 <div className="v2-share-brand">
                   <Sparkles size={18} />
@@ -1886,7 +1897,7 @@ export function ExchangeHome({
                   <b>𝕏</b>
                   {shareBusy ? shareCopy.sharing : shareCopy.post}
                 </button>
-                {hydrated && typeof navigator !== 'undefined' && typeof navigator.share === 'function' && <button onClick={() => void shareNative()} type="button"><Share2 size={17}/>{locale==='ja'?'共有する':'Share'}</button>}
+                {hydrated && typeof navigator !== 'undefined' && typeof navigator.share === 'function' && <button onClick={() => void shareNative()} type="button"><Share2 size={17}/>{locale==='ja'?'共有する':locale === 'zh-cn' ? '分享' : 'Share'}</button>}
                 <button
                   disabled={shareBusy}
                   onClick={() => void saveShareImage()}
@@ -1897,7 +1908,7 @@ export function ExchangeHome({
                 </button>
                 <button onClick={() => void copyListingUrl()} type="button">
                   <Copy size={17} />
-                  {locale==='ja'?'リンクをコピー':'Copy link'}
+                  {locale==='ja'?'リンクをコピー':locale === 'zh-cn' ? '复制链接' : 'Copy link'}
                 </button>
                 <button onClick={() => void copyListingText()} type="button">
                   <Copy size={17} />
@@ -2046,8 +2057,8 @@ export function ExchangeHome({
             <div className="v2-success-body">
               <p>{locale==='ja'?'ARCANA LINKで条件が合う交換相手が見つかりました。同じように探している人へ共有できます。':'You found a compatible trade on ARCANA LINK. Share it with others looking for partners.'}</p>
               <div className="v2-share-actions">
-                <button className="v2-x-button" onClick={postTradeSuccessToX} type="button">𝕏 {locale==='ja'?'で共有':'Share on X'}</button>
-                {hydrated && typeof navigator !== 'undefined' && typeof navigator.share === 'function' && <button onClick={()=>void shareTradeSuccessNative()} type="button"><Share2 size={17}/>{locale==='ja'?'共有する':'Share'}</button>}
+                <button className="v2-x-button" onClick={postTradeSuccessToX} type="button">𝕏 {locale==='ja'?'で共有':locale === 'zh-cn' ? '在X分享' : 'Share on X'}</button>
+                {hydrated && typeof navigator !== 'undefined' && typeof navigator.share === 'function' && <button onClick={()=>void shareTradeSuccessNative()} type="button"><Share2 size={17}/>{locale==='ja'?'共有する':locale === 'zh-cn' ? '分享' : 'Share'}</button>}
               </div>
               <small>{locale==='ja'?'相手のUID・名前・交換内容は共有文に含みません。':'The other player’s name, UID and trade details are not shared.'}</small>
             </div>

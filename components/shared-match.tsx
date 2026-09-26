@@ -6,6 +6,7 @@ import {
   normalizeInventory,
   type InventoryCounts,
 } from '@/lib/arcana-profile';
+import { sharedTradeUrl } from '@/lib/trade-sharing';
 import { track } from '@/lib/analytics';
 import { evaluateMatch } from '@/lib/matching';
 import {
@@ -25,7 +26,6 @@ export function SharedMatch({
   active: boolean;
 }) {
   const [comparison, setComparison] = useState<Comparison>('unregistered');
-  const [ownServer, setOwnServer] = useState<ServerRegion | null>(null);
 
   /* oxlint-disable react/react-compiler -- Comparison depends on browser-only saved inventory. */
   useEffect(() => {
@@ -41,7 +41,6 @@ export function SharedMatch({
       ) as unknown;
       const complete =
         Array.isArray(reviewed) && reviewed.length === arcanaCards.length;
-      setOwnServer(savedServer);
       if (!own || !savedServer || !complete) return;
       if (savedServer !== server) {
         setComparison('different-server');
@@ -58,22 +57,14 @@ export function SharedMatch({
   }, [server, inventory]);
   /* oxlint-enable react/react-compiler */
 
-  const params = new URLSearchParams({
-    server: ownServer ?? server,
-    utm_source: 'shared_listing',
-    utm_medium: 'referral',
-    compare: '1',
-  });
-  if (comparison !== 'unregistered' && comparison !== 'exact') {
-    params.set('publish', '1');
-  }
+  const compareUrl = sharedTradeUrl({server, inventory}, 'ja', 'shared_listing');
 
   if (!active) {
     return (
       <section className="shared-compare is-inactive">
         <h2>この募集は現在受付中ではありません</h2>
         <p>あなたの所持状況を登録すると、受付中の別の募集と比較できます。</p>
-        <a href={`/?${params.toString()}#inventory`}>受付中の交換相手を探す</a>
+        <a href={active ? compareUrl : "/#inventory"}>受付中の交換相手を探す</a>
       </section>
     );
   }
@@ -84,7 +75,7 @@ export function SharedMatch({
         <h2>🎉 この募集と条件が一致しています</h2>
         <p>同じサーバーで、お互いの求・譲が一致しています。</p>
         <a
-          href={`/?${params.toString()}#matches`}
+          href={compareUrl}
           onClick={() => track('shared_listing_compare_start', { server })}
         >
           交換を進める
@@ -107,7 +98,7 @@ export function SharedMatch({
           : '未所持と余っているカードを選ぶだけ。約30秒でこの募集との条件を自動比較できます。'}
       </p>
       <a
-        href={`/?${params.toString()}#inventory`}
+        href={active ? compareUrl : "/#inventory"}
         onClick={() => track('shared_listing_compare_start', { server })}
       >
         {registered ? '自分の募集を公開する' : 'あなたのカードと条件が合うか確認'}
