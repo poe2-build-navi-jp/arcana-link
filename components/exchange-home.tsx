@@ -118,7 +118,7 @@ const collectionShareCopy = {
     remaining: 'あと{count}種類',
     noDuplicates: '重複なし',
     challenge: 'あなたは何種類？',
-    post: '画像付きでXに投稿',
+    post: 'Xで募集する',
     download: 'X用画像を保存',
     copied: '投稿文をコピー',
     copiedDone: '投稿文をコピーしました',
@@ -140,7 +140,7 @@ const collectionShareCopy = {
     remaining: '{count} to go',
     noDuplicates: 'No duplicates yet',
     challenge: 'How many have you found?',
-    post: 'Post to X with image',
+    post: 'Post to X',
     download: 'Save image for X',
     copied: 'Copy post text',
     copiedDone: 'Post text copied',
@@ -162,7 +162,7 @@ const collectionShareCopy = {
     remaining: '还差{count}种',
     noDuplicates: '暂无重复牌',
     challenge: '你已经收集了多少种？',
-    post: '带图片发布到X',
+    post: '在X发布',
     download: '保存X用图片',
     copied: '复制发布文案',
     copiedDone: '发布文案已复制',
@@ -914,7 +914,7 @@ export function ExchangeHome({
 
   function openExchangeTable() {
     if (!profile.server) { setServerOpen(true); return; }
-    track('exchange_table_create', {server:profile.server});
+    track('exchange_table_create', {server:profile.server});track('trade_list_created', {server:profile.server});
     setShareOpen(true);
   }
 
@@ -1237,7 +1237,7 @@ export function ExchangeHome({
           </span>
         </a>
         <nav aria-label="Main navigation">
-          <a href="/genshin-arcana/exchange-table">{locale === 'ja' ? '交換表' : locale === 'en' ? 'Exchange table' : '交换表'}</a>
+          <a href={locale === 'ja' ? "/genshin-arcana/exchange-table" : "#inventory"} onClick={event=>{if(locale!=='ja' && reviewComplete){event.preventDefault();openExchangeTable();}}}>{locale === 'ja' ? '交換表' : locale === 'en' ? 'Exchange table' : '交换表'}</a>
           <a href="#inventory">{copy.inventory}</a>
           <a href="#matches">{copy.autoMatch}</a>
           <a href={localizedPath(locale, 'genshin-arcana')}>
@@ -1372,7 +1372,7 @@ export function ExchangeHome({
           <button
             className="v2-share-launch"
             disabled={!reviewComplete}
-            onClick={() => {if(!reviewComplete){setToast(locale==='ja'?`残り${22-reviewedCount}種類を確認してください。`:'Review all 22 cards first.');window.location.hash='inventory';return;}if (!profile.server) {setServerOpen(true); return;} track('exchange_table_create', {server:profile.server}); setShareOpen(true);}}
+            onClick={() => {if(!reviewComplete){setToast(locale==='ja'?`残り${22-reviewedCount}種類を確認してください。`:'Review all 22 cards first.');window.location.hash='inventory';return;}if (!profile.server) {setServerOpen(true); return;} track('exchange_table_create', {server:profile.server});track('trade_list_created', {server:profile.server}); setShareOpen(true);}}
             type="button"
           >
             <span>
@@ -1856,7 +1856,7 @@ export function ExchangeHome({
             </header>
             <div className="v2-share-body">
               {publishSuccess && <div className="v2-publish-success"><p><b>Server：</b>{activeServerLabel}</p><p><b>{locale==='ja'?'求':locale === 'zh-cn' ? '求' : 'Wanted'}：</b>{missing.map(card=>labels[card]).join(' / ')||'—'}</p><p><b>{locale==='ja'?'譲':locale === 'zh-cn' ? '出' : 'Offered'}：</b>{duplicates.map(card=>labels[card]).join(' / ')||'—'}</p><p>{locale==='ja'?'この募集を共有すると、交換相手に見つけてもらいやすくなります。':locale === 'zh-cn' ? '分享此招募，让条件相符的玩家找到你。' : 'Share this listing so compatible players can find it.'}</p></div>}
-              <ExchangeTable inventory={inventory} server={profile.server} status={profile.status} publicId={(saving ? undefined : profile.publicId)} locale={locale} />
+              <ExchangeTable inventory={inventory} server={profile.server} status={profile.status} publicId={(!saving && !profileDirty && !listingExpired ? profile.publicId : undefined)} locale={locale} />
               {!profile.publicId && <div className="v2-match-wait-cta"><b>{locale==='ja'?'交換表が完成しました ✓':locale==='en'?'Your trade list is ready ✓':'交换表已完成 ✓'}</b><p>{locale==='ja'?'同じ条件を7日間保存し、新しい募集とも自動比較できます。UID入力は次の画面で行い、共有文や画像には載せません。':locale === 'zh-cn' ? '保存条件7天，与之后的招募自动比较。下一步填写UID，但分享文案和图片不会包含UID。' : 'Save these conditions for 7 days and compare them with future listings. Your UID is never included in share text or images.'}</p><button className="v2-primary" onClick={publishCurrentListing} type="button">{locale==='ja'?'この条件でマッチ待ちする':locale==='en'?'Save and wait for matches':'保存并等待匹配'}</button></div>}
               <div className="v2-share-preview">
                 <div className="v2-share-brand">
@@ -1915,6 +1915,7 @@ export function ExchangeHome({
                   {locale==='ja'?'募集文をコピー':locale==='en'?'Copy listing text':'复制招募文案'}
                 </button>
               </div>
+              <p>{locale==='ja'?'画像も載せる場合は、保存した画像をXの投稿画面で添付してください。':locale==='en'?'To include an image, attach the saved image in the X composer.':'如需配图，请在X发布页面附上已保存的图片。'}</p>
               <p className="v2-share-privacy">
                 <ShieldCheck size={16} /> {shareCopy.privacy}
               </p>
