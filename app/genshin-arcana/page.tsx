@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
   title: '原神 月諭アルカナ交換のやり方｜募集・相手の探し方 | ARCANA LINK',
   description:
-    '原神「月諭のアルカナ」とは何か、幻想シアターでの入手条件、月諭の箱を使う交換方法を解説。同じサーバーの求・譲が合う相手探しと22種類一覧にも対応。',
+    '原神の月諭アルカナ交換は、同じサーバーのフレンドとマルチプレイ中に「月諭の箱」を使います。交換条件、操作手順、交換できないときの確認点と、求・譲が合う相手の探し方を解説。',
   alternates: {
     canonical: '/genshin-arcana',
     languages: languageAlternates('genshin-arcana'),
@@ -40,6 +40,10 @@ const faq = [
     a: '交換相手を探すときは、同じサーバーを選んでください。サーバーが異なると同じ世界に合流できないため、交換を完了できません。',
   },
   {
+    q: '原神のアルカナ交換には何が必要ですか？',
+    a: '同じサーバーのフレンド、交換するアルカナ、ゲーム内アイテム「月諭の箱」を確認します。マルチプレイで同じ世界に入り、塵歌壺の外で箱から交換招待を送ります。',
+  },
+  {
     q: '交換相手に何を教えても大丈夫ですか？',
     a: 'フレンド検索に必要なUIDと交換条件以外の情報は、原則として共有する必要がありません。パスワードや認証コードは絶対に教えないでください。',
   },
@@ -54,7 +58,7 @@ export default async function GenshinArcana() {
     description:
       '原神の月諭アルカナ交換をする前に必要な準備と、条件の合う相手の探し方を解説します。',
     datePublished: '2026-09-05',
-    dateModified: '2026-09-26',
+    dateModified: '2026-09-29T00:08:24+09:00',
     image: 'https://arcana-card-link.pages.dev/images/arcana-trade-reciprocal-match.svg',
     citation: 'https://genshin.hoyoverse.com/ja/news/detail/159349',
     inLanguage: 'ja',
@@ -70,8 +74,8 @@ export default async function GenshinArcana() {
       />
       <ArticleShell
         kicker="GENSHIN ARCANA GUIDE"
-        title="原神 月諭のアルカナ交換方法"
-        lead="月諭のアルカナで欲しい一枚を探したい人へ。交換前の準備、条件の登録、実際にフレンドと交換するまでの流れをまとめました。"
+        title="原神 月諭のアルカナ交換方法・条件"
+        lead="原神の月諭アルカナは、同じサーバーのフレンドとマルチプレイ中に「月諭の箱」を使って交換します。交換場所は塵歌壺の外です。準備・操作手順・交換できないときの確認点を順番に案内します。"
         path="genshin-arcana"
       >
         <section aria-labelledby="arcana-answer">
@@ -102,12 +106,13 @@ export default async function GenshinArcana() {
           <b>このページの内容</b>
           <a href="#what">原神の月諭アルカナとは</a>
           <a href="#before">交換相手を探す前に確認すること</a>
+          <a href="#conditions">アルカナの交換条件</a>
           <a href="#find">アルカナ交換の募集を探す方法</a>
           <a href="#exchange-status">現在の交換状況</a>
           <a href="#steps">交換完了までの手順</a>
           <a href="#cant-find-partner">相手が見つからないとき</a><a href="#uid">UIDとサーバー</a><a href="#complete-guide">22種類の整理</a><a href="#faq">よくある質問</a>
         </nav>
-        {summary && <ExchangeInsights locale="ja" summary={summary} />}
+        {summary ? <ExchangeInsights locale="ja" summary={summary} /> : <section id="exchange-status"><h2>現在の交換状況</h2><p>現在、公開募集データを取得できません。募集が0件であることを示すものではありません。<a href="/">マッチング画面</a>で読み込み状況を確認してください。</p></section>}
         <section id="what">
           <h2>原神の月諭アルカナとは</h2>
           <p>
@@ -137,6 +142,21 @@ export default async function GenshinArcana() {
               <li>マルチプレイで合流できる時間</li>
             </ul>
           </div>
+        </section>
+        <section id="conditions">
+          <h2>原神のアルカナを交換する条件</h2>
+          <div className="seo-table-wrap">
+            <table className="seo-table">
+              <thead><tr><th scope="col">確認するもの</th><th scope="col">交換前の確認</th></tr></thead>
+              <tbody>
+                <tr><th scope="row">交換相手</th><td>同じサーバーのフレンドと交換します。相手のUIDとサーバーを確認してから申請します。</td></tr>
+                <tr><th scope="row">合流する場所</th><td>マルチプレイで同じ世界に入り、塵歌壺の外で操作します。</td></tr>
+                <tr><th scope="row">使うアイテム</th><td>ゲーム内の「月諭の箱」から、フレンドに交換招待を送ります。</td></tr>
+                <tr><th scope="row">交換するカード</th><td>渡す種類・受け取る種類と枚数を両者で確認します。サイト上の所持数も最新に合わせます。</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>ゲーム内の交換仕様の出典：<a href="https://genshin.hoyoverse.com/ja/news/detail/159349">原神公式「Luna Ⅰ」バージョンアップのお知らせ</a>。ARCANA LINKの「2枚以上を譲にする」という判定は、コレクション用の1枚を残すためのサイト側のルールです。</p>
         </section>
         <section id="find">
           <h2>原神のアルカナ交換募集を探す方法</h2>
@@ -171,19 +191,35 @@ export default async function GenshinArcana() {
         </section>
         <section id="steps">
           <h2>フレンドとアルカナを交換する手順</h2>
-          <p>
-            条件が合ったらUIDからフレンド申請を行い、交換するカードと合流時間を確認します。マルチプレイで同じ世界に合流した後、「塵歌壺」の外で「月諭の箱」を使い、フレンドへ交換招待を送ります。ゲーム内の案内に従ってお互いにカードを選択します。確定ボタンを押す前に、種類と枚数が事前の約束と合っているかを両者で確認しましょう。
-          </p>
+          <ol>
+            <li><b>求・譲を決める：</b>欲しいカードと渡せるカードを整理し、相手と交換する種類・枚数を確認します。<a href="/genshin-arcana/exchange-table">交換表</a>を使うと条件をまとめられます。</li>
+            <li><b>フレンドになる：</b>同じサーバーであることを確認し、UIDからフレンド申請を行います。</li>
+            <li><b>同じ世界に合流する：</b>合流時間を相談し、マルチプレイで合流します。塵歌壺の外へ移動してください。</li>
+            <li><b>交換を招待する：</b>「月諭の箱」を使い、ゲーム内の案内に従ってフレンドへ交換招待を送ります。</li>
+            <li><b>双方のカードを確認して確定する：</b>渡すカードと受け取るカードの種類・枚数を確認し、ゲーム内で交換します。</li>
+            <li><b>所持数と募集を更新する：</b>交換後の枚数を確認してARCANA LINKにも反映します。募集を終える場合は状態を「終了」にします。</li>
+          </ol>
           <p>
             パスワードや認証コードは交換に必要ありません。これらの情報を求められた場合は交換を中止し、アカウントの安全を優先してください。
           </p>
         </section>
         <section id="cant-find-partner">
-          <h2>交換相手が見つからないときの確認順</h2>
+          <h2>アルカナ交換ができない・相手が見つからないとき</h2>
           <p>まずサーバーを確認し、次に所持数をゲーム内の最新状態に合わせてください。欲しいカードが相手にあっても、相手の欲しいカードを自分が出せなければ完全マッチにはなりません。</p>
-          <ol><li>「求」は0枚、「譲」は2枚以上として入力する。</li><li>同じサーバーの募集で、双方が渡せるカードを確認する。</li><li>公開募集を更新する。7日以上更新のない募集は候補から外れます。</li><li>交換表をXやnoteから共有して、自分の条件に合う人を募る。</li></ol>
-          <p>募集がないときは、成立を保証する数字やサンプルを実際の相手と見なさず、新しい募集を待ちましょう。</p>
-          <a href="/genshin-arcana/exchange-table">求・譲の交換表を作る →</a>
+          <div className="seo-table-wrap">
+            <table className="seo-table">
+              <thead><tr><th scope="col">今の状態</th><th scope="col">次に確認すること</th></tr></thead>
+              <tbody>
+                <tr><th scope="row">相手と合流できない</th><td>サーバーとフレンド登録を確認します。サイトの表示言語を変えてもゲームのサーバーは変わりません。</td></tr>
+                <tr><th scope="row">ゲーム内で交換を始められない</th><td>マルチプレイで同じ世界にいるか、塵歌壺の外か、「月諭の箱」から招待しているかを確認します。エラーが表示されたら、その内容を確認してください。</td></tr>
+                <tr><th scope="row">完全マッチが0件</th><td>0枚が求、2枚以上が譲として登録されているかを確認します。条件が正しければ募集を公開し、交換表を共有して次の候補を待てます。</td></tr>
+                <tr><th scope="row">自分の募集が候補に出ない</th><td>公開保存が完了したか、状態が受付中か、更新から7日以上たっていないかを確認します。実際の所持数を確認して募集を更新してください。</td></tr>
+                <tr><th scope="row">募集の読み込みエラー</th><td>候補0件とは異なり、データを確認できていない状態です。通信状態を確認して再読み込みします。</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p><b>条件の例：</b>求・譲が次の種類だけの場合、自分が「求：世界／譲：魔術師」、同じサーバーの相手が「求：魔術師／譲：世界」なら相互に一致します。相手の求が「月」だけなら、自分は渡せるカードがないため完全マッチにはなりません。この例は実際の募集データではありません。</p>
+          <nav className="seo-actions"><a href="/#inventory">所持数を登録して交換相手を探す</a><a href="/genshin-arcana/exchange-table">求・譲の交換表を作る</a><a href="/guide#publish">募集の公開・更新方法を確認する</a></nav>
         </section>
         <section id="uid"><h2>UIDとサーバーを安全に伝える</h2><p>UIDは原神内で相手を検索するために使います。言語設定からサーバーを推測せず、ゲーム内の表示を確認してください。共有URL・X本文・交換表の画像にはUIDを含めません。公開募集への登録時のみ、交換相手にUIDが表示されることを確認して保存してください。</p></section>
         <section id="complete-guide"><h2>22種類コンプリートに向けた所持数の整理</h2><p>1枚だけ持っているカードはコレクション用として残し、2枚以上ある種類を交換候補にします。交換が完了したら、渡した種類を減らし、受け取った種類を増やして再確認しましょう。未所持が減るほど条件が限定されるので、足りないカードの個別ページからサーバー別の募集状況も確認できます。</p><a href="/arcana">22種類一覧から不足カードを見る →</a></section>
@@ -206,7 +242,7 @@ export default async function GenshinArcana() {
             LINK運営が独自に整理したものです。第三者の画像、ロゴ、音楽、物語文、キャラクター素材は掲載していません。当サイトは非公式であり、対象ゲームの開発・運営会社とは関係ありません。
           </p>
         </section>
-        <p className="updated">公開日：2026年9月5日 / 最終更新：2026年9月26日</p>
+        <p className="updated">公開日：2026年9月5日 / 最終更新：2026年9月29日</p>
       </ArticleShell>
     </>
   );
