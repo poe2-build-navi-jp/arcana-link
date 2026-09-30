@@ -1321,9 +1321,10 @@ export function ExchangeHome({
 
       <section className="quality-intro">
         <h2>{summary?.open === 0 ? (locale==='ja'?'月諭のアルカナ交換表を30秒で作成':locale==='en'?'Create your Lunar Arcana trade list in 30 seconds':'30秒制作月谕圣牌交换表') : (locale==='ja'?'掲示板を1件ずつ探す必要はありません':locale==='en'?'Skip searching listings one by one':'无需逐条查找交换帖')}</h2>
+        {locale === 'ja' && <p>ARCANA LINKは、原神「月諭のアルカナ」の交換相手を探す無料ツールです。欲しいカード（求）と余っているカード（譲）を選ぶと、同じサーバーでお互いの条件が合う公開募集を自動で探せます。実際の交換は原神のゲーム内で行います。</p>}
         {summary?.open === 0 && <p>{locale==='ja'?'交換相手がまだいなくても交換表を作成でき、そのまま同じ条件でマッチ待ちできます。':locale === 'zh-cn' ? '先制作交换表，再发布相同条件的招募以等待自动匹配。' : 'Create a useful trade list now, then keep the same conditions active for automatic matching.'}</p>}
         <ul><li>{locale==='ja'?'お互いの「求・譲」を自動比較':locale==='en'?'Compare both wanted and offered cards':'自动比较双方求与出'}</li><li>{locale==='ja'?'同じサーバーだけ表示':locale==='en'?'Show players on your server only':'仅显示同服务器玩家'}</li><li>{locale==='ja'?'条件一致した相手を優先表示':locale==='en'?'Prioritize two-way matches':'优先显示双向匹配'}</li><li>{locale==='ja'?'7日以上更新のない募集は除外':locale==='en'?'Exclude listings inactive for 7 days':'排除7天未更新招募'}</li></ul>
-        <nav><a className="card-seo-action" href={reviewComplete ? "#inventory" : "#quick-create"} onClick={startQuickRegistration}>{locale==='ja'?'30秒で交換募集を作る':locale==='en'?'Create my trade list':'制作交换表'}</a><a href={localizedPath(locale,'guide')}>{locale==='ja'?'使い方を見る':locale === 'zh-cn' ? '使用方法' : 'How it works'}</a></nav>
+        <nav><a className="card-seo-action" href={reviewComplete ? "#inventory" : "#quick-create"} onClick={startQuickRegistration}>{locale==='ja'?'求・譲を登録して交換相手を探す':locale==='en'?'Create my trade list':'制作交换表'}</a>{locale === 'ja' && <a href="/genshin-arcana">原神アルカナの交換方法・条件</a>}<a href={localizedPath(locale,'guide')}>{locale==='ja'?'登録・募集公開の使い方':locale === 'zh-cn' ? '使用方法' : 'How it works'}</a></nav>
       </section>
       {summary && <ExchangeInsights locale={locale} now={currentTime} summary={summary} />}
       <section className="v2-overview" aria-labelledby="collection-heading">

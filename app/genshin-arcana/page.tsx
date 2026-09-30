@@ -58,7 +58,7 @@ export default async function GenshinArcana() {
     description:
       '原神の月諭アルカナ交換をする前に必要な準備と、条件の合う相手の探し方を解説します。',
     datePublished: '2026-09-05',
-    dateModified: '2026-09-29T00:08:24+09:00',
+    dateModified: '2026-10-01T03:40:46+09:00',
     image: 'https://arcana-card-link.pages.dev/images/arcana-trade-reciprocal-match.svg',
     citation: 'https://genshin.hoyoverse.com/ja/news/detail/159349',
     inLanguage: 'ja',
@@ -78,6 +78,11 @@ export default async function GenshinArcana() {
         lead="原神の月諭アルカナは、同じサーバーのフレンドとマルチプレイ中に「月諭の箱」を使って交換します。交換場所は塵歌壺の外です。準備・操作手順・交換できないときの確認点を順番に案内します。"
         path="genshin-arcana"
       >
+        <nav className="seo-actions" aria-label="アルカナ交換でやりたいことを選ぶ">
+          <a href="/#inventory">求・譲を登録して交換相手を探す</a>
+          <a href="#steps">ゲーム内の交換手順を見る</a>
+          <a href="/genshin-arcana/exchange-table">求・譲の交換表を作る</a>
+        </nav>
         <section aria-labelledby="arcana-answer">
           <h2 id="arcana-answer">原神のアルカナとは？入手・交換の要点</h2>
           <p>原神「月諭のアルカナ」は、幻想シアターの月諭モードで集める全22種類のコレクションです。すべてのアルカナ挑戦を終えて第十幕をクリアすると抽選でき、フレンドとの交換にはゲーム内アイテム「月諭の箱」を使います。</p>
@@ -93,8 +98,9 @@ export default async function GenshinArcana() {
           <h2 id="service-answer">アルカナ交換相手はどう探す？</h2>
           <p>ARCANA LINKは、原神「月諭のアルカナ」の交換相手を探す非公式ツールです。サーバーを選び、22種類の所持数を登録すると、同じサーバーでお互いの求・譲が一致する公開募集を確認できます。実際のカード交換は原神のゲーム内で行います。</p>
           <p>0枚は「求」、2枚以上は「譲」として判定します。「完全マッチ」は登録条件の一致であり、相手の承諾や交換成立を保証するものではありません。</p>
-          <nav className="seo-actions"><a href="/#inventory">カードを登録して相手を探す</a><a href="/guide#match">具体例で完全マッチを確認する</a></nav>
+          <nav className="seo-actions"><a href="/#inventory">カードを登録して相手を探す</a><a href="/guide#match">具体例で完全マッチを確認する</a><a href="/guide#board">アルカナ交換掲示板との違いを見る</a></nav>
         </section>
+        {summary ? <ExchangeInsights locale="ja" summary={summary} /> : <section id="exchange-status"><h2>現在の交換状況</h2><p>現在、公開募集データを取得できません。募集が0件であることを示すものではありません。<a href="/">マッチング画面</a>で読み込み状況を確認してください。</p></section>}
         <SeoFigure
           src="/images/arcana-trade-reciprocal-match.svg"
           alt="月諭アルカナ交換で22種類の所持数を登録し、同じサーバーの相手と双方の求・譲を照合して完全マッチを探す流れ"
@@ -112,7 +118,6 @@ export default async function GenshinArcana() {
           <a href="#steps">交換完了までの手順</a>
           <a href="#cant-find-partner">相手が見つからないとき</a><a href="#uid">UIDとサーバー</a><a href="#complete-guide">22種類の整理</a><a href="#faq">よくある質問</a>
         </nav>
-        {summary ? <ExchangeInsights locale="ja" summary={summary} /> : <section id="exchange-status"><h2>現在の交換状況</h2><p>現在、公開募集データを取得できません。募集が0件であることを示すものではありません。<a href="/">マッチング画面</a>で読み込み状況を確認してください。</p></section>}
         <section id="what">
           <h2>原神の月諭アルカナとは</h2>
           <p>
@@ -242,7 +247,7 @@ export default async function GenshinArcana() {
             LINK運営が独自に整理したものです。第三者の画像、ロゴ、音楽、物語文、キャラクター素材は掲載していません。当サイトは非公式であり、対象ゲームの開発・運営会社とは関係ありません。
           </p>
         </section>
-        <p className="updated">公開日：2026年9月5日 / 最終更新：2026年9月29日</p>
+        <p className="updated">公開日：2026年9月5日 / 最終更新：2026年10月1日</p>
       </ArticleShell>
     </>
   );

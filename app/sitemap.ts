@@ -31,8 +31,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       ...(locale === 'ja' && pageImages[path]
         ? { images: [`${base}${pageImages[path]}`] }
         : {}),
-      lastModified: locale === 'ja' && path === 'genshin-arcana'
-        ? new Date('2026-09-29T00:08:24+09:00')
+      lastModified: locale === 'ja' && (path === '' || path === 'genshin-arcana')
+        ? new Date('2026-10-01T03:40:46+09:00')
         : locale === 'ja' && pageImages[path]
         ? new Date('2026-09-26')
         : new Date('2026-09-17'),
